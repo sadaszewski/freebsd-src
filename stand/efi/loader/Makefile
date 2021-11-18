@@ -24,7 +24,8 @@ SRCS=	autoload.c \
 	self_reloc.c \
 	vers.c \
 	gfx_fb.c \
-	8x16.c
+	8x16.c \
+	tpm2.c
 
 CFLAGS+=	-I${.CURDIR}/../loader
 .if ${MK_LOADER_ZFS} != "no"
