@@ -12,7 +12,7 @@
 
 #include <IndustryStandard/Tpm12.h>
 #include <IndustryStandard/Tpm20.h>
-#include <Uefi.h>
+
 
 //
 // Standard event types
@@ -162,6 +162,7 @@ typedef struct tdUEFI_PLATFORM_FIRMWARE_BLOB2 {
 /// This structure is used in EV_EFI_BOOT_SERVICES_APPLICATION,
 /// EV_EFI_BOOT_SERVICES_DRIVER and EV_EFI_RUNTIME_SERVICES_DRIVER
 ///
+#if 0
 typedef struct tdEFI_IMAGE_LOAD_EVENT {
   EFI_PHYSICAL_ADDRESS              ImageLocationInMemory;
   UINTN                             ImageLengthInMemory;
@@ -169,6 +170,7 @@ typedef struct tdEFI_IMAGE_LOAD_EVENT {
   UINTN                             LengthOfDevicePath;
   EFI_DEVICE_PATH_PROTOCOL          DevicePath[1];
 } EFI_IMAGE_LOAD_EVENT;
+#endif // commented out on purpose
 
 ///
 /// UEFI_IMAGE_LOAD_EVENT
@@ -176,6 +178,7 @@ typedef struct tdEFI_IMAGE_LOAD_EVENT {
 /// This structure is used in EV_EFI_BOOT_SERVICES_APPLICATION,
 /// EV_EFI_BOOT_SERVICES_DRIVER and EV_EFI_RUNTIME_SERVICES_DRIVER
 ///
+#if 0
 typedef struct tdUEFI_IMAGE_LOAD_EVENT {
   EFI_PHYSICAL_ADDRESS              ImageLocationInMemory;
   UINT64                            ImageLengthInMemory;
@@ -183,6 +186,7 @@ typedef struct tdUEFI_IMAGE_LOAD_EVENT {
   UINT64                            LengthOfDevicePath;
   EFI_DEVICE_PATH_PROTOCOL          DevicePath[1];
 } UEFI_IMAGE_LOAD_EVENT;
+#endif // commented out to compile
 
 ///
 /// EFI_HANDOFF_TABLE_POINTERS
@@ -262,6 +266,7 @@ typedef struct {
   INT8                              VariableData[1];
 } EFI_VARIABLE_DATA_TREE;
 
+#if 0
 typedef struct tdEFI_GPT_DATA {
   EFI_PARTITION_TABLE_HEADER  EfiPartitionHeader;
   UINTN                       NumberOfPartitions;
@@ -273,6 +278,7 @@ typedef struct tdUEFI_GPT_DATA {
   UINT64                      NumberOfPartitions;
   EFI_PARTITION_ENTRY         Partitions[1];
 } UEFI_GPT_DATA;
+#endif // commented out
 
 #define TCG_DEVICE_SECURITY_EVENT_DATA_SIGNATURE "SPDM Device Sec"
 #define TCG_DEVICE_SECURITY_EVENT_DATA_VERSION   0
