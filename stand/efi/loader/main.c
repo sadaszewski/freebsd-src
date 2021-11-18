@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <smbios.h>
 
 #include "efizfs.h"
+#include "efitpm2.h"
 
 #include "loader_efi.h"
 
@@ -1144,6 +1145,8 @@ main(int argc, CHAR16 *argv[])
 #ifdef EFI_SECUREBOOT
 	ve_efi_init();
 #endif
+
+	tpm2_init();
 
 	/*
 	 * Try and find a good currdev based on the image that was booted.

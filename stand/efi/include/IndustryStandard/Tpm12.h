@@ -1,48 +1,7 @@
-
-Skip to content
-
-    Why GitHub? 
-
-Team
-Enterprise
-Explore
-Marketplace
-Pricing
-
-Sign in
-Sign up
-tianocore /
-edk2
-Public
-
-2.6k
-
-    1.5k
-
-Code
-Pull requests 80
-Actions
-Projects
-Security
-
-    Insights
-
-edk2/MdePkg/Include/IndustryStandard/Tpm12.h
-@Coeur
-Coeur MdePkg/IndustryStandard: Fix various typos
-Latest commit b219e2c on Feb 7, 2020
-History
-6 contributors
-@lgao4
-@jljusten
-@sun-rui
-@mdkinney
-@hhtian
-@Coeur
-2167 lines (1994 sloc) 90.5 KB
 /** @file
   TPM Specification data structures (TCG TPM Specification Version 1.2 Revision 103)
   See http://trustedcomputinggroup.org for latest specification updates
+
   Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
@@ -2207,18 +2166,3 @@ typedef struct tdTPM_RSP_COMMAND_HDR {
 
 #endif
 
-    © 2021 GitHub, Inc.
-    Terms
-    Privacy
-    Security
-    Status
-    Docs
-
-    Contact GitHub
-    Pricing
-    API
-    Training
-    Blog
-    About
-
-Loading complete
