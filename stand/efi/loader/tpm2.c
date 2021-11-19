@@ -1,14 +1,11 @@
-#include <efitpm2.h>
+#include "efitpm2.h"
+#include "efitpm2nv.h"
 
 #include <efi.h>
 #include <efilib.h>
 #include <efichar.h>
 
 #include <Protocol/Tcg2Protocol.h>
-
-//#define EFI_TCG2_PROTOCOL_GUID \
-//  {0x607f766c, 0x7455, 0x42be, { 0x93, 0x0b, 0xe4, 0xd7, 0x6d, 0xb2, 0x72, 0x0f }}
-
 
 static EFI_GUID tcg2_protocol = EFI_TCG2_PROTOCOL_GUID;
 static EFI_TCG2_PROTOCOL *tcg2 = NULL;
@@ -17,14 +14,32 @@ static EFI_TCG2_PROTOCOL *tcg2 = NULL;
 EFI_STATUS tpm2_init() {
 	EFI_STATUS status;
 	
-	ST->ConOut->OutputString(ST->ConOut, (CHAR16 *)L"Trying to locate TCG2 protocol...\r\n");
+	printf("Trying to locate TCG2 protocol...\n");
 	status = BS->LocateProtocol(&tcg2_protocol, NULL, (VOID **)&tcg2);
 
 	if (status != EFI_SUCCESS) {
-		ST->ConOut->OutputString(ST->ConOut, (CHAR16 *)L"Failed to locate TCG2 protocol.\r\n");
+		printf("Failed to locate TCG2 protocol.\n");
 		BS->Exit(IH, status, 0, NULL);
 	}
 	
-	ST->ConOut->OutputString(ST->ConOut, (CHAR16 *)L"Successfully located TCG2 protocol.\r\n");
+	printf("Successfully located TCG2 protocol.\n");
+
+	TPMI_RH_NV_INDEX NvIndex = 0x01;
+	TPM2B_NV_PUBLIC NvPublic;
+	TPM2B_NAME NvName;
+	
+	status = Tpm2NvReadPublic (NvIndex, &NvPublic, &NvName);
+	if (status != EFI_SUCCESS) {
+		printf("Failed to read public NV at index %x.\n", NvIndex);
+	} else {
+		printf("Read name: %.*s\n", NvName.size, NvName.name);
+	}
+	
+	time_t now;
+	time_t then = getsecs();
+	do {
+		now = getsecs();
+	} while (now - then < 5);
+	
 	return EFI_SUCCESS;
 }
