@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <smbios.h>
 
 #include "efitpm2.h"
+#include "efitpm2nv.h"
 #include "efizfs.h"
 #include "framebuffer.h"
 

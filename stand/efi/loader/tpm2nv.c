@@ -83,7 +83,7 @@ static EFI_STATUS Tpm2SubmitCommand (
 
 static UINT16 ReadUnaligned16 (const UINT16 *Buffer) {
 	if (Buffer == NULL) {
-		printf("Buffer is NULL in ReadUnaligned16");
+		printf("Buffer is NULL in ReadUnaligned16\n");
 		BS->Exit(IH, EFI_INVALID_PARAMETER, 0, NULL);
 		return ((UINT16) -1);
 	}
@@ -93,7 +93,7 @@ static UINT16 ReadUnaligned16 (const UINT16 *Buffer) {
 
 static UINT32 ReadUnaligned32 (const UINT32 *Buffer) {
  	if (Buffer == NULL) {
-		printf("Buffer is NULL in ReadUnaligned32");
+		printf("Buffer is NULL in ReadUnaligned32\n");
 		BS->Exit(IH, EFI_INVALID_PARAMETER, 0, NULL);
 		return ((UINT32) -1);
 	}
@@ -103,7 +103,7 @@ static UINT32 ReadUnaligned32 (const UINT32 *Buffer) {
 
 static UINT32 WriteUnaligned32 (UINT32 *Buffer, UINT32 Value) {
 	if (Buffer == NULL) {
-		printf("Buffer is NULL in WriteUnaligned32");
+		printf("Buffer is NULL in WriteUnaligned32\n");
 		BS->Exit(IH, EFI_INVALID_PARAMETER, 0, NULL);
 		return ((UINT32) -1);
 	}
