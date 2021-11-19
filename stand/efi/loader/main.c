@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 
 #include "efizfs.h"
 #include "efitpm2.h"
+#include "efitpm2nv.h"
 
 #include "loader_efi.h"
 
