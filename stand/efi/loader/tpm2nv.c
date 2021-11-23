@@ -8,6 +8,7 @@
 
 #define RC_NV_ReadPublic_nvIndex            (TPM_RC_H + TPM_RC_1)
 
+#pragma pack(1)
 
 typedef struct {
 	TPM2_COMMAND_HEADER	Header;
@@ -20,6 +21,8 @@ typedef struct {
 	TPM2B_NV_PUBLIC			NvPublic;
 	TPM2B_NAME				NvName;
 } TPM2_NV_READPUBLIC_RESPONSE;
+
+#pragma pack()
 
 
 static INT16 SwapBytes16 (UINT16 Value) {
