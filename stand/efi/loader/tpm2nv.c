@@ -6,7 +6,15 @@
 #include <Protocol/Tcg2Protocol.h>
 
 
-#define RC_NV_ReadPublic_nvIndex            (TPM_RC_H + TPM_RC_1)
+#define RC_NV_ReadPublic_nvIndex	(TPM_RC_H + TPM_RC_1)
+#define RC_NV_Read_authHandle		(TPM_RC_H + TPM_RC_1)
+#define RC_NV_Read_nvIndex		(TPM_RC_H + TPM_RC_2)
+
+
+#ifndef EFI_SECURITY_VIOLATION
+#define EFI_SECURITY_VIOLATION	EFIERR(26)
+#endif
+
 
 #pragma pack(1)
 
@@ -21,6 +29,23 @@ typedef struct {
 	TPM2B_NV_PUBLIC			NvPublic;
 	TPM2B_NAME				NvName;
 } TPM2_NV_READPUBLIC_RESPONSE;
+
+typedef struct {
+	TPM2_COMMAND_HEADER	Header;
+	TPMI_RH_NV_AUTH		AuthHandle;
+	TPMI_RH_NV_INDEX		NvIndex;
+	UINT32					AuthSessionSize;
+	TPMS_AUTH_COMMAND		AuthSession;
+	UINT16					Size;
+	UINT16					Offset;
+} TPM2_NV_READ_COMMAND;
+
+typedef struct {
+	TPM2_RESPONSE_HEADER	Header;
+	UINT32					AuthSessionSize;
+	TPM2B_MAX_BUFFER		Data;
+	TPMS_AUTH_RESPONSE		AuthSession;
+} TPM2_NV_READ_RESPONSE;
 
 #pragma pack()
 
@@ -101,6 +126,17 @@ static UINT32 ReadUnaligned32 (const UINT32 *Buffer) {
 		return ((UINT32) -1);
 	}
 	return *Buffer;
+}
+
+
+static UINT16 WriteUnaligned16 (UINT16 *Buffer, UINT16 Value) {
+	if (Buffer == NULL) {
+		printf("NULL buffer passed to WriteUnaligned16\n");
+		BS->Exit(IH, EFI_INVALID_PARAMETER, 0, NULL);
+		return ((UINT16) -1);
+	}
+
+	return (*Buffer = Value);
 }
 
 
@@ -221,3 +257,191 @@ EFI_STATUS Tpm2NvReadPublic (
 
 	return EFI_SUCCESS;
 }
+
+
+UINT32 CopyAuthSessionCommand (
+	TPMS_AUTH_COMMAND		*AuthSessionIn,
+	UINT8					*AuthSessionOut
+) {
+	UINT8  *Buffer;
+
+	Buffer = (UINT8 *)AuthSessionOut;
+
+	//
+	// Add in Auth session
+	//
+	if (AuthSessionIn != NULL) {
+		//  sessionHandle
+		WriteUnaligned32 ((UINT32 *)Buffer, SwapBytes32(AuthSessionIn->sessionHandle));
+		Buffer += sizeof(UINT32);
+
+		// nonce
+		WriteUnaligned16 ((UINT16 *)Buffer, SwapBytes16 (AuthSessionIn->nonce.size));
+		Buffer += sizeof(UINT16);
+
+		memcpy (Buffer, AuthSessionIn->nonce.buffer, AuthSessionIn->nonce.size);
+		Buffer += AuthSessionIn->nonce.size;
+
+		// sessionAttributes
+		*(UINT8 *)Buffer = *(UINT8 *)&AuthSessionIn->sessionAttributes;
+		Buffer++;
+
+		// hmac
+		WriteUnaligned16 ((UINT16 *)Buffer, SwapBytes16 (AuthSessionIn->hmac.size));
+		Buffer += sizeof(UINT16);
+
+		memcpy (Buffer, AuthSessionIn->hmac.buffer, AuthSessionIn->hmac.size);
+		Buffer += AuthSessionIn->hmac.size;
+	} else {
+		//  sessionHandle
+		WriteUnaligned32 ((UINT32 *)Buffer, SwapBytes32(TPM_RS_PW));
+		Buffer += sizeof(UINT32);
+
+		// nonce = nullNonce
+		WriteUnaligned16 ((UINT16 *)Buffer, SwapBytes16(0));
+		Buffer += sizeof(UINT16);
+
+		// sessionAttributes = 0
+		*(UINT8 *)Buffer = 0x00;
+		Buffer++;
+
+		// hmac = nullAuth
+		WriteUnaligned16 ((UINT16 *)Buffer, SwapBytes16(0));
+		Buffer += sizeof(UINT16);
+	}
+
+	return (UINT32)((UINTN)Buffer - (UINTN)AuthSessionOut);
+}
+
+
+EFI_STATUS Tpm2NvRead (
+	TPMI_RH_NV_AUTH AuthHandle,
+	TPMI_RH_NV_INDEX NvIndex,
+	TPMS_AUTH_COMMAND *AuthSession,
+	UINT16 Size,
+	UINT16 Offset,
+	TPM2B_MAX_BUFFER *OutData
+) {
+
+	EFI_STATUS Status;
+	TPM2_NV_READ_COMMAND SendBuffer;
+	TPM2_NV_READ_RESPONSE RecvBuffer;
+	UINT32 SendBufferSize;
+	UINT32 RecvBufferSize;
+	UINT8 *Buffer;
+	UINT32 SessionInfoSize;
+	TPM_RC ResponseCode;
+  
+	//
+	// Construct command
+	//
+	SendBuffer.Header.tag = SwapBytes16(TPM_ST_SESSIONS);
+	SendBuffer.Header.commandCode = SwapBytes32(TPM_CC_NV_Read);
+
+	SendBuffer.AuthHandle = SwapBytes32 (AuthHandle);
+	SendBuffer.NvIndex = SwapBytes32 (NvIndex);
+  
+	//
+	// Add in Auth session
+	//
+	Buffer = (UINT8 *)&SendBuffer.AuthSession;
+
+	// sessionInfoSize
+	SessionInfoSize = CopyAuthSessionCommand (AuthSession, Buffer);
+	Buffer += SessionInfoSize;
+	SendBuffer.AuthSessionSize = SwapBytes32(SessionInfoSize);
+
+	WriteUnaligned16 ((UINT16 *)Buffer, SwapBytes16 (Size));
+	Buffer += sizeof(UINT16);
+	WriteUnaligned16 ((UINT16 *)Buffer, SwapBytes16 (Offset));
+	Buffer += sizeof(UINT16);
+
+	SendBufferSize = (UINT32)(Buffer - (UINT8 *)&SendBuffer);
+	SendBuffer.Header.paramSize = SwapBytes32 (SendBufferSize);
+
+	//
+	// send Tpm command
+	//
+	RecvBufferSize = sizeof (RecvBuffer);
+	Status = Tpm2SubmitCommand (SendBufferSize, (UINT8 *)&SendBuffer, &RecvBufferSize, (UINT8 *)&RecvBuffer);
+	if (EFI_ERROR (Status)) {
+		goto Done;
+	}	
+
+	if (RecvBufferSize < sizeof (TPM2_RESPONSE_HEADER)) {
+		printf("Tpm2NvRead - RecvBufferSize Error - %x\n", RecvBufferSize);
+		Status = EFI_DEVICE_ERROR;
+		goto Done;
+	}
+	ResponseCode = SwapBytes32(RecvBuffer.Header.responseCode);
+	if (ResponseCode != TPM_RC_SUCCESS) {
+		printf("Tpm2NvRead - responseCode - %x\n", ResponseCode);
+	}
+	switch (ResponseCode) {
+	case TPM_RC_SUCCESS:
+		// return data
+		break;
+	case TPM_RC_NV_AUTHORIZATION:
+		Status = EFI_SECURITY_VIOLATION;
+		break;
+	case TPM_RC_NV_LOCKED:
+		Status = EFI_ACCESS_DENIED;
+		break;
+	case TPM_RC_NV_RANGE:
+		Status = EFI_BAD_BUFFER_SIZE;
+		break;
+	case TPM_RC_NV_UNINITIALIZED:
+		Status = EFI_NOT_READY;
+		break;
+	case TPM_RC_HANDLE + RC_NV_Read_nvIndex: // TPM_RC_NV_DEFINED:
+		Status = EFI_NOT_FOUND;
+		break;
+	case TPM_RC_HANDLE + RC_NV_Read_authHandle: // TPM_RC_NV_DEFINED:
+		Status = EFI_INVALID_PARAMETER;
+		break;
+	case TPM_RC_VALUE + RC_NV_Read_nvIndex:
+	case TPM_RC_VALUE + RC_NV_Read_authHandle:
+		Status = EFI_INVALID_PARAMETER;
+		break;
+	case TPM_RC_BAD_AUTH + RC_NV_Read_authHandle + TPM_RC_S:
+		Status = EFI_INVALID_PARAMETER;
+		break;
+	case TPM_RC_AUTH_UNAVAILABLE:
+		Status = EFI_INVALID_PARAMETER;
+		break;
+	case TPM_RC_AUTH_FAIL + RC_NV_Read_authHandle + TPM_RC_S:
+		Status = EFI_INVALID_PARAMETER;
+		break;
+	case TPM_RC_ATTRIBUTES + RC_NV_Read_authHandle + TPM_RC_S:
+		Status = EFI_UNSUPPORTED;
+		break;
+	default:
+		Status = EFI_DEVICE_ERROR;
+		break;
+	}
+	if (Status != EFI_SUCCESS) {
+		goto Done;
+	}
+
+	//
+	// Return the response
+	//
+	OutData->size = SwapBytes16 (RecvBuffer.Data.size);
+	if (OutData->size > MAX_DIGEST_BUFFER) {
+		printf("Tpm2NvRead - OutData->size error %x\n", OutData->size);
+		Status = EFI_DEVICE_ERROR;
+		goto Done;
+	}
+
+	memcpy(OutData->buffer, &RecvBuffer.Data.buffer, OutData->size);
+
+Done:
+	//
+	// Clear AuthSession Content
+	//
+	bzero (&SendBuffer, sizeof(SendBuffer));
+	bzero (&RecvBuffer, sizeof(RecvBuffer));
+  
+	return Status;
+}
+
