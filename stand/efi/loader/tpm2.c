@@ -23,23 +23,29 @@ EFI_STATUS tpm2_init() {
 	}
 	
 	printf("Successfully located TCG2 protocol.\n");
-
-	TPMI_RH_NV_INDEX NvIndex = 0x01;
-	TPM2B_NV_PUBLIC NvPublic;
-	TPM2B_NAME NvName;
 	
-	status = Tpm2NvReadPublic (NvIndex, &NvPublic, &NvName);
-	if (status != EFI_SUCCESS) {
-		printf("Failed to read public NV at index %x.\n", NvIndex);
-	} else {
-		printf("Read name: %.*s\n", NvName.size, NvName.name);
+	printf("NV_INDEX_FIRST: 0x%x\n", NV_INDEX_FIRST);
+	printf("NV_INDEX_LAST: 0x%x\n", NV_INDEX_LAST);
+
+	for (int i = 0; i < 3; i++) {
+		TPMI_RH_NV_INDEX NvIndex = 0x1000001;
+		TPM2B_NV_PUBLIC NvPublic;
+		TPM2B_NAME NvName;
+		
+		status = Tpm2NvReadPublic (NvIndex, &NvPublic, &NvName);
+		if (status != EFI_SUCCESS) {
+			printf("Failed to read public NV at index 0x%x.\n", NvIndex);
+		} else {
+			printf("Read name: %.*s\n", NvName.size, NvName.name);
+		}
+
 	}
 	
 	time_t now;
 	time_t then = getsecs();
 	do {
 		now = getsecs();
-	} while (now - then < 5);
+	} while (now - then < 10);
 	
 	return EFI_SUCCESS;
 }
