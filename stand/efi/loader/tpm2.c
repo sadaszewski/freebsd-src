@@ -41,6 +41,27 @@ EFI_STATUS tpm2_init() {
 
 	}
 	
+	printf("Trying Tpm2StartAuthSession...\n");
+	TPM2B_DIGEST NonceCaller = { 16 };
+	TPM2B_ENCRYPTED_SECRET Salt = { 0 };
+	TPMT_SYM_DEF Symmetric = { TPM_ALG_NULL };
+	TPMI_SH_AUTH_SESSION SessionHandle;
+	TPM2B_NONCE NonceTPM;
+	status = Tpm2StartAuthSession (
+		TPM_RH_NULL,	// TpmKey
+		TPM_RH_NULL,	// Bind
+		&NonceCaller,
+		&Salt,
+		TPM_SE_POLICY,	// SessionType
+		&Symmetric,
+		TPM_ALG_SHA256,	//AuthHash
+		&SessionHandle,
+		&NonceTPM
+	);
+	printf("status: 0x%lx\n", status);
+	printf("SessionHandle: 0x%x\n", SessionHandle);
+	printf("NonceTPM.size: %d\n", NonceTPM.size);
+	
 	time_t now;
 	time_t then = getsecs();
 	do {
