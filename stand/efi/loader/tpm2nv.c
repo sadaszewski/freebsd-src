@@ -277,7 +277,7 @@ EFI_STATUS Tpm2NvReadPublic (
 }
 
 
-UINT32 CopyAuthSessionCommand (
+static UINT32 CopyAuthSessionCommand (
 	TPMS_AUTH_COMMAND		*AuthSessionIn,
 	UINT8					*AuthSessionOut
 ) {
