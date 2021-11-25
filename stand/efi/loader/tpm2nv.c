@@ -600,6 +600,40 @@ typedef struct {
 } TPM2_POLICY_PCR_RESPONSE;
 #endif
 
+
+static void print_as_bytes(void *d, UINT32 size) {
+	UINT8 *Buffer = (UINT8*) d;
+	for (UINT32 i = 0; i < size; i++) {
+		printf("0x%x ", Buffer[i]);
+	}
+	printf("\n");
+}
+
+
+static void debug_tpm2_policy_pcr_send_buffer(
+	TPM2_POLICY_PCR_COMMAND	*SendBuffer,
+	UINT32						SendBufferSize
+) {
+	printf("debug_tpm2_policy_pcr_send_buffer:\n");
+	printf("Header.tag: 0x%x, should be: 0x%x\n", SwapBytes16(SendBuffer->Header.tag), TPM_ST_NO_SESSIONS);
+	printf("Header.paramSize: %d, should be: %d\n", SwapBytes32(SendBuffer->Header.paramSize), SendBufferSize);
+	printf("Header.commandCode: 0x%x, should be: 0x%x\n", SwapBytes32(SendBuffer->Header.commandCode), TPM_CC_PolicyPCR);
+	printf("PolicySession: 0x%x\n", SwapBytes32(SendBuffer->PolicySession));
+	UINT8 *Buffer = (UINT8*) &SendBuffer->PcrDigest;
+	printf("PcrDigest.size: %u\n", SwapBytes16(*((UINT16*) Buffer)));
+	Buffer += sizeof(UINT16);
+	printf("Pcrs.count: %u\n", SwapBytes32(*((UINT32*) Buffer)));
+	Buffer += sizeof(UINT32);
+	TPMS_PCR_SELECTION *sel = (TPMS_PCR_SELECTION*) Buffer;
+	printf("Pcrs.pcrSelections[0].hash: 0x%x, TPM_ALG_SHA256: 0x%x\n", SwapBytes16(sel->hash), TPM_ALG_SHA256);
+	printf("Pcrs.pcrSelections[0].sizeofSelect: %d\n", sel->sizeofSelect);
+	printf("Pcrs.pcrSelections[0].pcrSelect: "); print_as_bytes(sel->pcrSelect, sel->sizeofSelect);
+	Buffer += sizeof(UINT16) + sizeof(UINT8) + sel->sizeofSelect;
+	
+	printf("size check: %lu, should be: %lu\n", ((UINTN) Buffer) - ((UINTN) (UINT8*) SendBuffer), (UINTN) SendBufferSize);
+}
+
+
 EFI_STATUS Tpm2PolicyPCR(
 	TPMI_SH_POLICY		PolicySession,
 	TPM2B_DIGEST		*PcrDigest,
@@ -639,6 +673,8 @@ EFI_STATUS Tpm2PolicyPCR(
 	
 	SendBufferSize = (UINT32) ((UINTN)Buffer - (UINTN)&SendBuffer);
 	SendBuffer.Header.paramSize = SwapBytes32(SendBufferSize);
+	
+	debug_tpm2_policy_pcr_send_buffer(&SendBuffer, SendBufferSize);
 	
 	//
 	// send Tpm command
