@@ -30,5 +30,11 @@ EFI_STATUS Tpm2StartAuthSession (
 	TPM2B_NONCE			*NonceTPM
 );
 
+EFI_STATUS Tpm2PolicyPCR(
+	TPMI_SH_POLICY		PolicySession,
+	TPM2B_DIGEST		*PcrDigest,
+	TPML_PCR_SELECTION	*Pcrs
+);
+
 #endif
 
