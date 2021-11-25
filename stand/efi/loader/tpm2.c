@@ -62,6 +62,25 @@ EFI_STATUS tpm2_init() {
 	printf("SessionHandle: 0x%x\n", SessionHandle);
 	printf("NonceTPM.size: %d\n", NonceTPM.size);
 	
+	printf("Trying Tpm2StartAuthSession...\n");
+	TPM2B_DIGEST PcrDigest = { .size = 0 };
+	TPML_PCR_SELECTION Pcrs = {
+		.count = 1,
+		.pcrSelections = {
+			{
+				.hash = TPM_ALG_SHA256,
+				.sizeofSelect = 1,
+				.pcrSelect = { (1 << 0) | (1 << 2) | (1 << 4) | (1 << 7) }
+			}
+		}
+	};
+	status = Tpm2PolicyPCR(
+		SessionHandle, 	// PolicySession
+		&PcrDigest,
+		&Pcrs
+	);
+	printf("status: 0x%lx\n", status);
+	
 	time_t now;
 	time_t then = getsecs();
 	do {
