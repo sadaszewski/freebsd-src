@@ -62,14 +62,14 @@ EFI_STATUS tpm2_init() {
 	printf("SessionHandle: 0x%x\n", SessionHandle);
 	printf("NonceTPM.size: %d\n", NonceTPM.size);
 	
-	printf("Trying Tpm2StartAuthSession...\n");
+	printf("Trying Tpm2PolicyPCR...\n");
 	TPM2B_DIGEST PcrDigest = { .size = 0 };
 	TPML_PCR_SELECTION Pcrs = {
 		.count = 1,
 		.pcrSelections = {
 			{
 				.hash = TPM_ALG_SHA256,
-				.sizeofSelect = 1,
+				.sizeofSelect = PCR_SELECT_MIN,
 				.pcrSelect = { (1 << 0) | (1 << 2) | (1 << 4) | (1 << 7) }
 			}
 		}
@@ -88,4 +88,30 @@ EFI_STATUS tpm2_init() {
 	} while (now - then < 10);
 	
 	return EFI_SUCCESS;
+}
+
+
+EFI_STATUS tpm2_geli_passphrase_from_efivar() {
+	const char *name = "KernGeomEliPassphrase";
+	char *freeme = NULL;
+	UINTN len = 0;
+	EFI_STATUS status;
+	
+	if (efi_freebsd_getenv(name, NULL, &len) == EFI_BUFFER_TOO_SMALL) {
+		freeme = malloc(len + 1);
+		if (freeme == NULL)
+			return (status = EFI_OUT_OF_RESOURCES);
+		if (efi_freebsd_getenv(name, freeme, &len) == EFI_SUCCESS) {
+			freeme[len] = '\0';
+			setenv("kern.geom.eli.passphrase", freeme, 1);
+			status = EFI_SUCCESS;
+		} else {
+			status = EFI_DEVICE_ERROR;
+		}
+		(void)free(freeme);
+	} else {
+		status = EFI_NOT_FOUND;
+	}
+	
+	return status;
 }

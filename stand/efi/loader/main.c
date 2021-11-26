@@ -942,6 +942,17 @@ main(int argc, CHAR16 *argv[])
 	 * Initialise the block cache. Set the upper limit.
 	 */
 	bcache_init(32768, 512);
+	
+	printf("Trying tpm2_geli_passphrase_from_efivar...\n");
+	rv = tpm2_geli_passphrase_from_efivar();
+	printf("rv: 0x%x\n", rv);
+	do {
+		time_t now;
+		time_t then = getsecs();
+		do {
+			now = getsecs();
+		} while (now - then < 10);
+	} while (0);
 
 	/*
 	 * Scan the BLOCK IO MEDIA handles then
