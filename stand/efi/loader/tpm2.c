@@ -244,6 +244,6 @@ void tpm2_try_autoboot_or_clear_geli_keys() {
 	printf("kernelname: %s\n", getenv("kernelname"));
 	printf("rootdev: %s\n", getenv("rootdev"));
 	//autoboot_maybe();
-	setenv("autoboot_delay", "-1", 1);
+	//setenv("autoboot_delay", "-1", 1);
 	pause(10);
 }
