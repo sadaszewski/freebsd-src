@@ -99,7 +99,7 @@ EFI_STATUS tpm2_init() {
 		    .sessionAttributes = 0,
 		    .hmac = { 0 }
 		};
-		status = Tpm2NvRead(SessionHandle, 0x1000001, &AuthSession, 12, 0, &OutData);
+		status = Tpm2NvRead(0x1000001, 0x1000001, &AuthSession, 12, 0, &OutData);
 		printf("status: 0x%lx\n", status);
 		OutData.buffer[12] = '\0';
 		printf("OutData.size: %u\n", OutData.size);
@@ -226,4 +226,24 @@ TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect, BYTE *sizeofSelect)
 	(void)free(policy_pcr);
 
 	return alg;
+}
+
+
+static void pause(time_t secs) {
+	time_t now;
+	time_t then = getsecs();
+	do {
+		now = getsecs();
+	} while (now - then < secs);
+}
+
+void autoboot_maybe(void);
+
+void tpm2_try_autoboot_or_clear_geli_keys() {
+	printf("currdev: %s\n", getenv("currdev"));
+	printf("kernelname: %s\n", getenv("kernelname"));
+	printf("rootdev: %s\n", getenv("rootdev"));
+	//autoboot_maybe();
+	setenv("autoboot_delay", "-1", 1);
+	pause(10);
 }

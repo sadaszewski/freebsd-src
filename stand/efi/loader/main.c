@@ -1190,6 +1190,8 @@ main(int argc, CHAR16 *argv[])
 	}
 #endif
 
+	tpm2_try_autoboot_or_clear_geli_keys();
+
 	interact();			/* doesn't return */
 
 	return (EFI_SUCCESS);		/* keep compiler happy */
