@@ -152,7 +152,7 @@ static TPMI_ALG_HASH resolve_hash_alg_name(const char *name) {
 }
 
 
-TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect) {
+TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect, BYTE *sizeofSelect) {
 	char *policy_pcr = NULL;
 	char *p;
 	char *pi;
@@ -160,21 +160,32 @@ TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect) {
 	UINT32 pcr_index;
 	TPMI_ALG_HASH alg;
 
+	bzero(pcrSelect, PCR_SELECT_MAX);
+	*sizeofSelect = PCR_SELECT_MIN;
+
 	policy_pcr = efi_freebsd_getenv_helper("KernGeomEliPassphraseFromTpm2PolicyPcr");
 	if (policy_pcr == NULL)
 		return TPM_ALG_ERROR;
 
-	p = pi = policy_pcr;
+	p = policy_pcr;
+	while (isspace(*p)) {
+		p++;
+	}
+	pi = p;
 	while (1) {
 		ch = *pi;
 		if (ch == ':') {
 			*pi = '\0';
+			*strchrnul(p, ' ') = '\0';
 			alg = resolve_hash_alg_name(p);
 			p = pi + 1;
 		} else if (ch == ',' || ch == '\0') {
 			*pi = '\0';
 			pcr_index = strtol(p, NULL, 10);
 			pcrSelect[(pcr_index / 8)] |= (1 << (pcr_index % 8));
+			if (1 + pcr_index / 8 > *sizeofSelect) {
+				*sizeofSelect = 1 + pcr_index / 8;
+			}
 			p = pi + 1;
 		}
 		if (ch == '\0') {
