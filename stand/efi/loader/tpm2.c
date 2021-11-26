@@ -115,3 +115,75 @@ EFI_STATUS tpm2_geli_passphrase_from_efivar() {
 	
 	return status;
 }
+
+
+static char *efi_freebsd_getenv_helper(const char *name) {
+	char *freeme = NULL;
+	UINTN len = 0;
+
+	if (efi_freebsd_getenv(name, NULL, &len) == EFI_BUFFER_TOO_SMALL) {
+		freeme = malloc(len + 1);
+		if (freeme == NULL)
+			return NULL;
+		if (efi_freebsd_getenv(name, freeme, &len) == EFI_SUCCESS) {
+			freeme[len] = '\0';
+			return freeme;
+		} else {
+			(void)free(freeme);
+			return NULL;
+		}
+	}
+
+	return NULL;
+}
+
+
+static TPMI_ALG_HASH resolve_hash_alg_name(const char *name) {
+	if (strcasecmp(name, "sha1") == 0)
+		return TPM_ALG_SHA1;
+	else if (strcasecmp(name, "sha256") == 0)
+		return TPM_ALG_SHA256;
+	else if (strcasecmp(name, "sha384") == 0)
+		return TPM_ALG_SHA384;
+	else if (strcasecmp(name, "sha512") == 0)
+		return TPM_ALG_SHA512;
+	else
+		return (TPMI_ALG_HASH) strtol(name, NULL, 16);
+}
+
+
+TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect) {
+	char *policy_pcr = NULL;
+	char *p;
+	char *pi;
+	char ch;
+	UINT32 pcr_index;
+	TPMI_ALG_HASH alg;
+
+	policy_pcr = efi_freebsd_getenv_helper("KernGeomEliPassphraseFromTpm2PolicyPcr");
+	if (policy_pcr == NULL)
+		return TPM_ALG_ERROR;
+
+	p = pi = policy_pcr;
+	while (1) {
+		ch = *pi;
+		if (ch == ':') {
+			*pi = '\0';
+			alg = resolve_hash_alg_name(p);
+			p = pi + 1;
+		} else if (ch == ',' || ch == '\0') {
+			*pi = '\0';
+			pcr_index = strtol(p, NULL, 10);
+			pcrSelect[(pcr_index / 8)] |= (1 << (pcr_index % 8));
+			p = pi + 1;
+		}
+		if (ch == '\0') {
+			break;
+		}
+		pi++;
+	}
+
+	(void)free(policy_pcr);
+
+	return alg;
+}
