@@ -4,6 +4,7 @@
 #include <efi.h>
 
 EFI_STATUS tpm2_init();
+EFI_STATUS tpm2_geli_passphrase_from_efivar();
 
 #endif
 
