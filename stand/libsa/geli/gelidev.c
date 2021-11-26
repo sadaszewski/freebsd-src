@@ -322,6 +322,7 @@ geli_probe_and_attach(struct open_file *f)
 		if ((rc = geli_passphrase(gdev, gelipw)) == 0) {
 			/* Passphrase is good, cache it. */
 			setenv("kern.geom.eli.passphrase", gelipw, 1);
+			setenv("kern.geom.eli.passphrase.matching_dev", disk_fmtdev(hdesc), 1);
 		}
 		explicit_bzero(gelipw, sizeof(gelipw));
 		if (rc != 0)
