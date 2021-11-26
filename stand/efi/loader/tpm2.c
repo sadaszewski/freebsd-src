@@ -73,7 +73,7 @@ EFI_STATUS tpm2_init() {
 			{
 				.hash = TPM_ALG_SHA256,
 				.sizeofSelect = PCR_SELECT_MIN,
-				.pcrSelect = { (1 << 0) | (1 << 2) | (1 << 4) | (1 << 7) }
+	            .pcrSelect = { (1 << 0) | (1 << 2) }
 			}
 		}
 	};
@@ -89,6 +89,23 @@ EFI_STATUS tpm2_init() {
 	TPMI_ALG_HASH alg = tpm2_parse_efivar_policy_spec(pcrSelect, &sizeofSelect);
 	printf("alg: 0x%x, sizeofSelect: %d, pcrSelect: 0x%x 0x%x 0x%x\n",
 	    alg, sizeofSelect, pcrSelect[0], pcrSelect[1], pcrSelect[2]);
+
+	do {
+		printf("Trying to actually read a PCR-policy protected NVindex...\n");
+		TPM2B_MAX_BUFFER OutData = { 0 };
+		TPMS_AUTH_COMMAND AuthSession = {
+		    .sessionHandle = SessionHandle,
+		    .nonce = { 0 },
+		    .sessionAttributes = 0,
+		    .hmac = { 0 }
+		};
+		status = Tpm2NvRead(SessionHandle, 0x1000001, &AuthSession, 12, 0, &OutData);
+		printf("status: 0x%lx\n", status);
+		OutData.buffer[12] = '\0';
+		printf("OutData.size: %u\n", OutData.size);
+		printf("OutData.buffer: %s\n", OutData.buffer);
+
+	} while (0);
 	
 	time_t now;
 	time_t then = getsecs();
