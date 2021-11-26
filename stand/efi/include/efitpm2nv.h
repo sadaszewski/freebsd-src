@@ -36,5 +36,11 @@ EFI_STATUS Tpm2PolicyPCR(
 	TPML_PCR_SELECTION	*Pcrs
 );
 
+EFI_STATUS Tpm2NvReadLock (
+    TPMI_RH_NV_AUTH		AuthHandle,
+    TPMI_RH_NV_INDEX	NvIndex,
+    TPMS_AUTH_COMMAND	*AuthSession
+);
+
 #endif
 

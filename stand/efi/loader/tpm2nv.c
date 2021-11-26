@@ -76,6 +76,20 @@ typedef struct {
 	TPM2_RESPONSE_HEADER	Header;
 } TPM2_POLICY_PCR_RESPONSE;
 
+typedef struct {
+	TPM2_COMMAND_HEADER       Header;
+	TPMI_RH_NV_AUTH           AuthHandle;
+	TPMI_RH_NV_INDEX          NvIndex;
+	UINT32                    AuthSessionSize;
+	TPMS_AUTH_COMMAND         AuthSession;
+} TPM2_NV_READLOCK_COMMAND;
+
+typedef struct {
+	TPM2_RESPONSE_HEADER       Header;
+	UINT32                     AuthSessionSize;
+	TPMS_AUTH_RESPONSE         AuthSession;
+} TPM2_NV_READLOCK_RESPONSE;
+
 #pragma pack()
 
 
@@ -695,4 +709,79 @@ EFI_STATUS Tpm2PolicyPCR(
 	}
 	
 	return EFI_SUCCESS;
+}
+
+
+EFI_STATUS Tpm2NvReadLock (
+    TPMI_RH_NV_AUTH		AuthHandle,
+    TPMI_RH_NV_INDEX	NvIndex,
+    TPMS_AUTH_COMMAND	*AuthSession
+) {
+	EFI_STATUS					Status;
+	TPM2_NV_READLOCK_COMMAND	SendBuffer;
+	TPM2_NV_READLOCK_RESPONSE	RecvBuffer;
+	UINT32		SendBufferSize;
+	UINT32		RecvBufferSize;
+	UINT8		*Buffer;
+	UINT32		SessionInfoSize;
+	TPM_RC		ResponseCode;
+
+	//
+	// Construct command
+	//
+	SendBuffer.Header.tag = SwapBytes16(TPM_ST_SESSIONS);
+	SendBuffer.Header.commandCode = SwapBytes32(TPM_CC_NV_ReadLock);
+
+	SendBuffer.AuthHandle = SwapBytes32 (AuthHandle);
+	SendBuffer.NvIndex = SwapBytes32 (NvIndex);
+
+	//
+	// Add in Auth session
+	//
+	Buffer = (UINT8 *)&SendBuffer.AuthSession;
+
+	// sessionInfoSize
+	SessionInfoSize = CopyAuthSessionCommand (AuthSession, Buffer);
+	Buffer += SessionInfoSize;
+	SendBuffer.AuthSessionSize = SwapBytes32(SessionInfoSize);
+
+	SendBufferSize = (UINT32)(Buffer - (UINT8 *)&SendBuffer);
+	SendBuffer.Header.paramSize = SwapBytes32 (SendBufferSize);
+
+	//
+	// send Tpm command
+	//
+	RecvBufferSize = sizeof (RecvBuffer);
+	Status = Tpm2SubmitCommand (SendBufferSize, (UINT8 *)&SendBuffer, &RecvBufferSize, (UINT8 *)&RecvBuffer);
+	if (EFI_ERROR (Status)) {
+		goto Done;
+	}
+
+	if (RecvBufferSize < sizeof (TPM2_RESPONSE_HEADER)) {
+		printf("Tpm2NvReadLock - RecvBufferSize Error - %x\n", RecvBufferSize);
+		Status = EFI_DEVICE_ERROR;
+		goto Done;
+	}
+
+	ResponseCode = SwapBytes32(RecvBuffer.Header.responseCode);
+	if (ResponseCode != TPM_RC_SUCCESS) {
+		printf("Tpm2NvReadLock - responseCode - %x\n", SwapBytes32(RecvBuffer.Header.responseCode));
+	}
+	switch (ResponseCode) {
+	case TPM_RC_SUCCESS:
+		// return data
+		break;
+	default:
+		Status = EFI_DEVICE_ERROR;
+		break;
+	}
+
+Done:
+	//
+	// Clear AuthSession Content
+	//
+	explicit_bzero(&SendBuffer, sizeof(SendBuffer));
+	explicit_bzero(&RecvBuffer, sizeof(RecvBuffer));
+
+	return Status;
 }
