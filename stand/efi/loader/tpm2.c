@@ -11,6 +11,9 @@ static EFI_GUID tcg2_protocol = EFI_TCG2_PROTOCOL_GUID;
 static EFI_TCG2_PROTOCOL *tcg2 = NULL;
 
 
+TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect, BYTE *sizeofSelect);
+
+
 EFI_STATUS tpm2_init() {
 	EFI_STATUS status;
 	
@@ -80,6 +83,12 @@ EFI_STATUS tpm2_init() {
 		&Pcrs
 	);
 	printf("status: 0x%lx\n", status);
+
+	BYTE pcrSelect[PCR_SELECT_MAX];
+	BYTE sizeofSelect;
+	TPMI_ALG_HASH alg = tpm2_parse_efivar_policy_spec(pcrSelect, &sizeofSelect);
+	printf("alg: 0x%x, sizeofSelect: %d, pcrSelect: 0x%x 0x%x 0x%x\n",
+	    alg, sizeofSelect, pcrSelect[0], pcrSelect[1], pcrSelect[2]);
 	
 	time_t now;
 	time_t then = getsecs();
@@ -167,6 +176,8 @@ TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect, BYTE *sizeofSelect)
 	if (policy_pcr == NULL)
 		return TPM_ALG_ERROR;
 
+	setenv("kern.geom.eli.passphrase.from_tpm2.policy_pcr", policy_pcr, 1);
+
 	p = policy_pcr;
 	while (isspace(*p)) {
 		p++;
@@ -176,7 +187,8 @@ TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect, BYTE *sizeofSelect)
 		ch = *pi;
 		if (ch == ':') {
 			*pi = '\0';
-			*strchrnul(p, ' ') = '\0';
+			if (strchr(p, ' ') != NULL)
+				*strchr(p, ' ') = '\0';
 			alg = resolve_hash_alg_name(p);
 			p = pi + 1;
 		} else if (ch == ',' || ch == '\0') {
