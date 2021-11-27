@@ -9,6 +9,8 @@
 
 #include "geliboot.h"
 
+#include <crypto/sha2/sha256.h>
+
 static EFI_GUID tcg2_protocol = EFI_TCG2_PROTOCOL_GUID;
 static EFI_TCG2_PROTOCOL *tcg2 = NULL;
 
@@ -387,11 +389,32 @@ static void destroy_crypto_info() {
 }
 
 
+static void tpm2_sha256(const char *data, size_t n, char *digest) {
+	SHA256_CTX ctx;
+
+	SHA256_Init(&ctx);
+	SHA256_Update(&ctx, data, n);
+	SHA256_Final(digest, &ctx);
+}
+
+
+static void sha256_digest_make_human_readable(const unsigned char *digest, char *digest_human_readable) {
+	for (size_t i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+		snprintf(digest_human_readable + i * 2, 3, "%02x", digest[i]);
+	}
+	digest_human_readable[2 * SHA256_DIGEST_LENGTH] = '\0';
+}
+
+
 void tpm2_check_passphrase_marker() {
 	int fd;
 	struct stat st;
-	BYTE buf[MAX_DIGEST_BUFFER];
+	BYTE buf[SHA256_DIGEST_LENGTH * 2 + 1];
 	const int timeout = 3;
+	SHA256_CTX ctx;
+	unsigned char digest[SHA256_DIGEST_LENGTH];
+	char digest_human_readable[SHA256_DIGEST_LENGTH * 2 + 1];
+	char *salt;
 
 	if (!passphrase_was_retrieved) {
 		printf("Passphrase from TPM was not used - OK.\n");
@@ -415,7 +438,7 @@ void tpm2_check_passphrase_marker() {
 		goto exit_timeout;
 	}
 
-	if (st.st_size >= MAX_DIGEST_BUFFER) {
+	if (st.st_size > SHA256_DIGEST_LENGTH * 2) {
 		printf("Passphrase marker too long, rebooting in %d secs...\n", timeout);
 		close(fd);
 		goto exit_timeout;
@@ -429,7 +452,19 @@ void tpm2_check_passphrase_marker() {
 	buf[st.st_size] = '\0';
 	close(fd);
 
-	if (strncmp(buf, passphrase_from_nvindex.buffer, MAX_DIGEST_BUFFER) != 0) {
+	SHA256_Init(&ctx);
+	salt = efi_freebsd_getenv_helper("KernGeomEliPassphraseFromTpm2Salt");
+	printf("salt: %s\n", salt);
+	if (salt != NULL) {
+		SHA256_Update(&ctx, salt, strlen(salt));
+		setenv("kern.geom.eli.passphrase.from_tpm2.salt", salt, 1);
+	}
+	SHA256_Update(&ctx, passphrase_from_nvindex.buffer, passphrase_from_nvindex.size);
+	SHA256_Final(digest, &ctx);
+	sha256_digest_make_human_readable(digest, digest_human_readable);
+	printf("digest_human_readable: %s\n", digest_human_readable);
+
+	if (strncmp(buf, digest_human_readable, SHA256_DIGEST_LENGTH * 2 + 1) != 0) {
 		printf("Passphrase marker does not match, rebooting in %d secs...\n", timeout);
 		goto exit_timeout;
 	}
