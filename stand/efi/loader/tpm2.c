@@ -7,6 +7,8 @@
 
 #include <Protocol/Tcg2Protocol.h>
 
+#include "geliboot.h"
+
 static EFI_GUID tcg2_protocol = EFI_TCG2_PROTOCOL_GUID;
 static EFI_TCG2_PROTOCOL *tcg2 = NULL;
 
@@ -339,10 +341,13 @@ void tpm2_retrieve_passphrase() {
 		printf("Tpm2NvReadPublic() failed - 0x%lx.\n", status);
 		return;
 	}
-	if (nvpublic.size >= MAX_DIGEST_BUFFER) {
+	if (nvpublic.nvPublic.dataSize >= MAX_DIGEST_BUFFER) {
 		printf("Stored passphrase too long.\n");
 		return;
 	}
+
+	printf("nvindex: 0x%x", nvindex);
+	printf("nvpublic.nvPublic.dataSize: %d\n", nvpublic.nvPublic.dataSize);
 
 	TPMS_AUTH_COMMAND AuthSession = {
 	    .sessionHandle = SessionHandle,
@@ -350,7 +355,7 @@ void tpm2_retrieve_passphrase() {
 	    .sessionAttributes = 0,
 	    .hmac = { 0 }
 	};
-	status = Tpm2NvRead(nvindex, nvindex, &AuthSession, nvpublic.size, 0, &passphrase_from_nvindex);
+	status = Tpm2NvRead(nvindex, nvindex, &AuthSession, nvpublic.nvPublic.dataSize, 0, &passphrase_from_nvindex);
 	if (status != EFI_SUCCESS) {
 		printf("Tpm2NvRead() failed - 0x%lx.\n", status);
 		return;
@@ -358,6 +363,27 @@ void tpm2_retrieve_passphrase() {
 	passphrase_from_nvindex.buffer[nvpublic.size] = '\0';
 	setenv("kern.geom.eli.passphrase", passphrase_from_nvindex.buffer, 1);
 	passphrase_was_retrieved = 1;
+	setenv("kern.geom.eli.passphrase.from_tpm2.was_retrieved", "1", 1);
+}
+
+
+static void destroy_crypto_info() {
+	explicit_bzero(&passphrase_from_nvindex, sizeof(passphrase_from_nvindex));
+	struct env_var *ev = env_getenv("kern.geom.eli.passphrase");
+	if (ev != NULL) {
+		char *zerome = ev->ev_value;
+		while (*zerome) {
+			*zerome++ = '\0';
+		}
+	}
+	struct keybuf *freeme = (struct keybuf*) malloc(sizeof(struct keybuf) + sizeof(struct keybuf_ent) * GELI_MAX_KEYS);
+	freeme->kb_nents = GELI_MAX_KEYS;
+	for (unsigned int i = 0; i < GELI_MAX_KEYS; i++) {
+		freeme->kb_ents[i].ke_type = KEYBUF_TYPE_GELI;
+		explicit_bzero(&freeme->kb_ents[i].ke_data[0], MAX_KEY_BYTES);
+	}
+	geli_import_key_buffer(freeme);
+	(void)free(freeme);
 }
 
 
@@ -365,6 +391,7 @@ void tpm2_check_passphrase_marker() {
 	int fd;
 	struct stat st;
 	BYTE buf[MAX_DIGEST_BUFFER];
+	const int timeout = 3;
 
 	if (!passphrase_was_retrieved) {
 		printf("Passphrase from TPM was not used - OK.\n");
@@ -372,40 +399,49 @@ void tpm2_check_passphrase_marker() {
 	}
 
 	if ((fd = open("/.passphrase_marker", O_RDONLY)) < 0) {
-		printf("Selected rootfs does not contain the passphrase marker, rebooting in 3 secs...\n");
-		goto exit_in_3;
+		printf("Selected rootfs does not contain the passphrase marker, rebooting in %d secs...\n", timeout);
+		goto exit_timeout;
 	}
 
 	if (fstat(fd, &st) < 0) {
-		printf("fstat() on passphrase marker failed, rebooting in 3 secs...\n");
+		printf("fstat() on passphrase marker failed, rebooting in %d secs...\n", timeout);
 		close(fd);
-		goto exit_in_3;
+		goto exit_timeout;
+	}
+
+	if (st.st_mode & 0077) {
+		printf("Passphrase marker has wrong permissions set, rebooting in %d secs...\n", timeout);
+		close(fd);
+		goto exit_timeout;
 	}
 
 	if (st.st_size >= MAX_DIGEST_BUFFER) {
-		printf("Passphrase marker too long, rebooting in 3 secs...\n");
+		printf("Passphrase marker too long, rebooting in %d secs...\n", timeout);
 		close(fd);
-		goto exit_in_3;
+		goto exit_timeout;
 	}
 
 	if (read(fd, buf, st.st_size) != st.st_size) {
-		printf("Failed to read the passphrase marker, rebooting in 3 secs...\n");
+		printf("Failed to read the passphrase marker, rebooting in %d secs...\n", timeout);
 		close(fd);
-		goto exit_in_3;
+		goto exit_timeout;
 	}
 	buf[st.st_size] = '\0';
 	close(fd);
 
 	if (strncmp(buf, passphrase_from_nvindex.buffer, MAX_DIGEST_BUFFER) != 0) {
-		printf("Passphrase marker does not match, rebooting in 3 secs...\n");
-		goto exit_in_3;
+		printf("Passphrase marker does not match, rebooting in %d secs...\n", timeout);
+		goto exit_timeout;
 	}
 
-	printf("Passphrase marker found and matching - OK.\n");
+	printf("Passphrase marker found and matching - autoboot in %d secs...\n", timeout);
+	setenv("kern.geom.eli.passphrase.from_tpm2.passphrase", passphrase_from_nvindex.buffer, 1);
 	setenv("autoboot_delay", "-1", 1);
+	pause(3);
 	return;
 
-exit_in_3:
-	pause(3);
+exit_timeout:
+	destroy_crypto_info();
+	pause(timeout);
 	efi_exit(EFI_NOT_FOUND);
 }
