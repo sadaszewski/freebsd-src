@@ -698,6 +698,63 @@ SYSCTL_INT(_kern, OID_AUTO, init_shutdown_timeout,
 	CTLFLAG_RW, &init_shutdown_timeout, 0, "Shutdown timeout of init(8). "
 	"Unused within kernel, but used to control init(8)");
 
+#define MAX_DIGEST_BUFFER 1024
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+static void tpm2_check_passphrase_marker() {
+	struct thread *td = curthread;
+
+	int error;
+	struct stat sb;
+	int fd;
+	char buf[MAX_DIGEST_BUFFER];
+
+	char *was_retrieved = kern_getenv("kern.geom.eli.passphrase.from_tpm2.was_retrieved");
+	char *passphrase = kern_getenv("kern.geom.eli.passphrase.from_tpm2.passphrase");
+
+	if (was_retrieved[0] != '1') {
+		printf("Passphrase from TPM was not used - OK.\n");
+		return;
+	}
+
+	error = kern_statat(td, 0, AT_FDCWD, "/.passphrase_marker", UIO_SYSSPACE, &sb, NULL);
+	if (error) {
+		panic("kern_statat() on passphrase marker failed");
+	}
+
+	if (sb.st_mode & 0077) {
+		panic("Passphrase marker has wrong permissions set");
+	}
+
+	if (sb.st_size >= MAX_DIGEST_BUFFER) {
+		panic("Passphrase marker too long");
+	}
+
+	error = kern_openat(td, AT_FDCWD, "/.passphrase_marker", UIO_SYSSPACE, O_RDONLY, 0);
+	if (error) {
+		panic("Cannot open the passphrase marker");
+	}
+	fd = td->td_retval[0];
+
+	error = kern_pread(td, fd, buf, sb.st_size, 0);
+	if (error) {
+		panic("Failed to read the passphrase marker");
+	}
+	buf[sb.st_size] = '\0';
+
+	if (strncmp(buf, passphrase, MAX_DIGEST_BUFFER) != 0) {
+		panic("Passphrase marker does not match");
+	}
+
+	printf("Passphrase marker found and matching - we are done.\n");
+	kern_unsetenv("kern.geom.eli.passphrase.from_tpm2.passphrase");
+
+	error = kern_close(td, fd);
+	if (error) {
+		printf("Failed to close passphrase marker - that's weird.\n");
+	}
+}
+
 /*
  * Start the initial user process; try exec'ing each pathname in init_path.
  * The program is invoked with one argument containing the boot flags.
@@ -719,6 +776,7 @@ start_init(void *dummy)
 	p = td->td_proc;
 
 	vfs_mountroot();
+	tpm2_check_passphrase_marker();
 
 	/* Wipe GELI passphrase from the environment. */
 	kern_unsetenv("kern.geom.eli.passphrase");
