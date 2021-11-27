@@ -10,6 +10,12 @@
 static EFI_GUID tcg2_protocol = EFI_TCG2_PROTOCOL_GUID;
 static EFI_TCG2_PROTOCOL *tcg2 = NULL;
 
+static TPMS_PCR_SELECTION pcr_selection;
+static TPMI_RH_NV_INDEX nvindex;
+static UINT8 try_retrieve_passphrase_from_tpm;
+static TPM2B_MAX_BUFFER passphrase_from_nvindex;
+static UINT8 passphrase_was_retrieved;
+
 
 TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect, BYTE *sizeofSelect);
 
@@ -211,10 +217,14 @@ TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect, BYTE *sizeofSelect)
 		} else if (ch == ',' || ch == '\0') {
 			*pi = '\0';
 			pcr_index = strtol(p, NULL, 10);
+			if (pcr_index / 8 >= PCR_SELECT_MAX) {
+				goto pcr_index_too_large;
+			}
 			pcrSelect[(pcr_index / 8)] |= (1 << (pcr_index % 8));
 			if (1 + pcr_index / 8 > *sizeofSelect) {
 				*sizeofSelect = 1 + pcr_index / 8;
 			}
+pcr_index_too_large:
 			p = pi + 1;
 		}
 		if (ch == '\0') {
@@ -237,7 +247,9 @@ static void pause(time_t secs) {
 	} while (now - then < secs);
 }
 
+
 void autoboot_maybe(void);
+
 
 void tpm2_try_autoboot_or_clear_geli_keys() {
 	printf("currdev: %s\n", getenv("currdev"));
@@ -246,4 +258,154 @@ void tpm2_try_autoboot_or_clear_geli_keys() {
 	//autoboot_maybe();
 	//setenv("autoboot_delay", "-1", 1);
 	pause(10);
+}
+
+
+static EFI_STATUS tpm2_parse_efivar_nvindex_spec(TPMI_RH_NV_INDEX *out) {
+	char *freeme = efi_freebsd_getenv_helper("KernGeomEliPassphraseFromTpm2NvIndex");
+	if (freeme == NULL)
+		return EFI_NOT_FOUND;
+	setenv("kern.geom.eli.passphrase.from_tpm2.nvindex", freeme, 1);
+	*out = strtol(freeme, NULL, 16);
+	(void)free(freeme);
+	return EFI_SUCCESS;
+}
+
+
+void tpm2_check_efivars() {
+	pcr_selection.hash = tpm2_parse_efivar_policy_spec(pcr_selection.pcrSelect, &pcr_selection.sizeofSelect);
+	if (pcr_selection.hash == TPM_ALG_ERROR) {
+		printf("Failed to retrieve TPM2 passphrase config (policy), will not try to retrieve.\n");
+		return;
+	}
+	if (tpm2_parse_efivar_nvindex_spec(&nvindex) != EFI_SUCCESS) {
+		printf("Failed to retrieve TPM2 passphrase config (nvindex), will not try to retrieve.\n");
+		return;
+	}
+	try_retrieve_passphrase_from_tpm = 1;
+}
+
+
+void tpm2_retrieve_passphrase() {
+	if (!try_retrieve_passphrase_from_tpm)
+		return;
+
+	printf("Trying to retrieve passphrase from TPM...\n");
+
+	EFI_STATUS status;
+
+	TPM2B_DIGEST NonceCaller = { 16 };
+	TPM2B_ENCRYPTED_SECRET Salt = { 0 };
+	TPMT_SYM_DEF Symmetric = { TPM_ALG_NULL };
+	TPMI_SH_AUTH_SESSION SessionHandle;
+	TPM2B_NONCE NonceTPM;
+	status = Tpm2StartAuthSession (
+	    TPM_RH_NULL,	// TpmKey
+	    TPM_RH_NULL,	// Bind
+	    &NonceCaller,
+	    &Salt,
+	    TPM_SE_POLICY,	// SessionType
+	    &Symmetric,
+	    TPM_ALG_SHA256,	//AuthHash
+	    &SessionHandle,
+	    &NonceTPM
+	);
+	if (status != EFI_SUCCESS) {
+		printf("Tpm2StartAuthSession() failed - 0x%lx.\n", status);
+		return;
+	}
+
+	TPM2B_DIGEST PcrDigest = { .size = 0 };
+	TPML_PCR_SELECTION Pcrs = {
+	    .count = 1,
+	    .pcrSelections = {
+	        pcr_selection
+	    }
+	};
+	status = Tpm2PolicyPCR(
+	    SessionHandle, 	// PolicySession
+	    &PcrDigest,
+	    &Pcrs
+	);
+	if (status != EFI_SUCCESS) {
+		printf("Tpm2PolicyPCR() failed - 0x%lx.\n", status);
+		return;
+	}
+
+	TPM2B_NV_PUBLIC nvpublic;
+	TPM2B_NAME nvname;
+	status = Tpm2NvReadPublic (nvindex, &nvpublic, &nvname);
+	if (status != EFI_SUCCESS) {
+		printf("Tpm2NvReadPublic() failed - 0x%lx.\n", status);
+		return;
+	}
+	if (nvpublic.size >= MAX_DIGEST_BUFFER) {
+		printf("Stored passphrase too long.\n");
+		return;
+	}
+
+	TPMS_AUTH_COMMAND AuthSession = {
+	    .sessionHandle = SessionHandle,
+	    .nonce = { 0 },
+	    .sessionAttributes = 0,
+	    .hmac = { 0 }
+	};
+	status = Tpm2NvRead(nvindex, nvindex, &AuthSession, nvpublic.size, 0, &passphrase_from_nvindex);
+	if (status != EFI_SUCCESS) {
+		printf("Tpm2NvRead() failed - 0x%lx.\n", status);
+		return;
+	}
+	passphrase_from_nvindex.buffer[nvpublic.size] = '\0';
+	setenv("kern.geom.eli.passphrase", passphrase_from_nvindex.buffer, 1);
+	passphrase_was_retrieved = 1;
+}
+
+
+void tpm2_check_passphrase_marker() {
+	int fd;
+	struct stat st;
+	BYTE buf[MAX_DIGEST_BUFFER];
+
+	if (!passphrase_was_retrieved) {
+		printf("Passphrase from TPM was not used - OK.\n");
+		return;
+	}
+
+	if ((fd = open("/.passphrase_marker", O_RDONLY)) < 0) {
+		printf("Selected rootfs does not contain the passphrase marker, rebooting in 3 secs...\n");
+		goto exit_in_3;
+	}
+
+	if (fstat(fd, &st) < 0) {
+		printf("fstat() on passphrase marker failed, rebooting in 3 secs...\n");
+		close(fd);
+		goto exit_in_3;
+	}
+
+	if (st.st_size >= MAX_DIGEST_BUFFER) {
+		printf("Passphrase marker too long, rebooting in 3 secs...\n");
+		close(fd);
+		goto exit_in_3;
+	}
+
+	if (read(fd, buf, st.st_size) != st.st_size) {
+		printf("Failed to read the passphrase marker, rebooting in 3 secs...\n");
+		close(fd);
+		goto exit_in_3;
+	}
+	buf[st.st_size] = '\0';
+	close(fd);
+
+	if (strncmp(buf, passphrase_from_nvindex.buffer, MAX_DIGEST_BUFFER) != 0) {
+		printf("Passphrase marker does not match, rebooting in 3 secs...\n");
+		goto exit_in_3;
+	}
+
+	printf("Passphrase marker found and matching - OK.\n");
+	setenv("autoboot_delay", "-1", 1);
+	return;
+
+exit_in_3:
+	pause(3);
+	efi_exit(EFI_NOT_FOUND);
 }
