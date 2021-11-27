@@ -966,16 +966,8 @@ main(int argc, CHAR16 *argv[])
 	 */
 	bcache_init(32768, 512);
 	
-	printf("Trying tpm2_geli_passphrase_from_efivar...\n");
-	rv = tpm2_geli_passphrase_from_efivar();
-	printf("rv: 0x%x\n", rv);
-	do {
-		time_t now;
-		time_t then = getsecs();
-		do {
-			now = getsecs();
-		} while (now - then < 10);
-	} while (0);
+	tpm2_check_efivars();
+	tpm2_retrieve_passphrase();
 
 	/*
 	 * Scan the BLOCK IO MEDIA handles then
@@ -1182,8 +1174,6 @@ main(int argc, CHAR16 *argv[])
 	ve_efi_init();
 #endif
 
-	tpm2_init();
-
 	/*
 	 * Try and find a good currdev based on the image that was booted.
 	 * It might be desirable here to have a short pause to allow falling
@@ -1195,6 +1185,8 @@ main(int argc, CHAR16 *argv[])
 		if (uefi_boot_mgr &&
 		    !interactive_interrupt("Failed to find bootable partition"))
 			return (EFI_NOT_FOUND);
+
+	tpm2_check_passphrase_marker();
 
 	autoload_font(false);	/* Set up the font list for console. */
 	efi_init_environment();
@@ -1213,8 +1205,6 @@ main(int argc, CHAR16 *argv[])
 		}
 	}
 #endif
-
-	tpm2_try_autoboot_or_clear_geli_keys();
 
 	interact();			/* doesn't return */
 
