@@ -24,9 +24,13 @@ SRCS=	autoload.c \
 	self_reloc.c \
 	vers.c \
 	gfx_fb.c \
-	8x16.c \
-	tpm2.c \
-	tpm2nv.c
+	8x16.c
+	
+.if ${MK_LOADER_TPM2_PASSPHRASE} == "yes"
+SRCS += tpm2.c
+SRCS += tpm2nv.c
+CFLAGS += -DLOADER_TPM2_PASSPHRASE
+.endif
 
 CFLAGS+=	-I${.CURDIR}/../loader
 .if ${MK_LOADER_ZFS} != "no"
