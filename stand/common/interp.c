@@ -64,6 +64,13 @@ interact(void)
 	interp_identifier = bootprog_interp;
 	interp_init();
 
+	printf("\n");
+
+	/*
+	 * Before interacting, we might want to autoboot.
+	 */
+	autoboot_maybe();
+
 #if defined(EFI) && defined(LOADER_TPM2_PASSPHRASE)
 	if (getenv("kern.geom.eli.passphrase.from_tpm2.was_retrieved")[0] == '1') {
 		// we cannot allow any interaction
@@ -71,13 +78,6 @@ interact(void)
 		exit(-1);
 	}
 #endif
-
-	printf("\n");
-
-	/*
-	 * Before interacting, we might want to autoboot.
-	 */
-	autoboot_maybe();
 
 	/*
 	 * Not autobooting, go manual
