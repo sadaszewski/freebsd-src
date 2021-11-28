@@ -698,8 +698,6 @@ SYSCTL_INT(_kern, OID_AUTO, init_shutdown_timeout,
 	CTLFLAG_RW, &init_shutdown_timeout, 0, "Shutdown timeout of init(8). "
 	"Unused within kernel, but used to control init(8)");
 
-void tpm2_check_passphrase_marker(void);
-
 /*
  * Start the initial user process; try exec'ing each pathname in init_path.
  * The program is invoked with one argument containing the boot flags.
@@ -721,7 +719,6 @@ start_init(void *dummy)
 	p = td->td_proc;
 
 	vfs_mountroot();
-	tpm2_check_passphrase_marker();
 
 	/* Wipe GELI passphrase from the environment. */
 	kern_unsetenv("kern.geom.eli.passphrase");
