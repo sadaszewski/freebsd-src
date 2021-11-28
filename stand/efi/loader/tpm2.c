@@ -369,7 +369,7 @@ void tpm2_retrieve_passphrase() {
 }
 
 
-static void destroy_crypto_info() {
+void destroy_crypto_info() {
 	explicit_bzero(&passphrase_from_nvindex, sizeof(passphrase_from_nvindex));
 	struct env_var *ev = env_getenv("kern.geom.eli.passphrase");
 	if (ev != NULL) {
@@ -472,6 +472,7 @@ void tpm2_check_passphrase_marker() {
 	printf("Passphrase marker found and matching - autoboot in %d secs...\n", timeout);
 	setenv("kern.geom.eli.passphrase.from_tpm2.passphrase", passphrase_from_nvindex.buffer, 1);
 	setenv("autoboot_delay", "-1", 1);
+	setenv("beastie_disable", "YES", 1);
 	pause(3);
 	return;
 
