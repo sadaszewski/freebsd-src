@@ -72,7 +72,7 @@ static void tpm2_check_passphrase_marker(void *param) {
 		mypanic("kern_statat() on passphrase marker failed");
 	}
 
-	if (sb.st_mode & 0077) {
+	if (sb.st_uid != 0 || (sb.st_mode & 0077)) {
 		mypanic("Passphrase marker has wrong permissions set");
 	}
 
@@ -108,7 +108,6 @@ static void tpm2_check_passphrase_marker(void *param) {
 	SHA256_Update(&ctx, passphrase, strlen(passphrase));
 	SHA256_Final(digest, &ctx);
 	sha256_digest_make_human_readable(digest, digest_human_readable);
-	printf("digest_human_readable: %s\n", digest_human_readable);
 
 	if (strncmp(buf, digest_human_readable, SHA256_DIGEST_LENGTH * 2 + 1) != 0) {
 		mypanic("Passphrase marker does not match");
