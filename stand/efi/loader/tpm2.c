@@ -432,7 +432,7 @@ void tpm2_check_passphrase_marker() {
 		goto exit_timeout;
 	}
 
-	if (st.st_mode & 0077) {
+	if (st.st_uid != 0 || (st.st_mode & 0077)) {
 		printf("Passphrase marker has wrong permissions set, rebooting in %d secs...\n", timeout);
 		close(fd);
 		goto exit_timeout;
@@ -462,7 +462,6 @@ void tpm2_check_passphrase_marker() {
 	SHA256_Update(&ctx, passphrase_from_nvindex.buffer, passphrase_from_nvindex.size);
 	SHA256_Final(digest, &ctx);
 	sha256_digest_make_human_readable(digest, digest_human_readable);
-	printf("digest_human_readable: %s\n", digest_human_readable);
 
 	if (strncmp(buf, digest_human_readable, SHA256_DIGEST_LENGTH * 2 + 1) != 0) {
 		printf("Passphrase marker does not match, rebooting in %d secs...\n", timeout);
