@@ -59,8 +59,11 @@ __FBSDID("$FreeBSD$");
 #include <smbios.h>
 
 #include "efizfs.h"
+
+#ifdef LOADER_TPM2_PASSPHRASE
 #include "efitpm2.h"
 #include "efitpm2nv.h"
+#endif
 
 #include "loader_efi.h"
 
@@ -942,8 +945,10 @@ main(int argc, CHAR16 *argv[])
 	 */
 	bcache_init(32768, 512);
 	
+#ifdef LOADER_TPM2_PASSPHRASE
 	tpm2_check_efivars();
 	tpm2_retrieve_passphrase();
+#endif
 
 	/*
 	 * Scan the BLOCK IO MEDIA handles then
@@ -1162,7 +1167,9 @@ main(int argc, CHAR16 *argv[])
 		    !interactive_interrupt("Failed to find bootable partition"))
 			return (EFI_NOT_FOUND);
 
+#ifdef LOADER_TPM2_PASSPHRASE
 	tpm2_check_passphrase_marker();
+#endif
 
 	autoload_font(false);	/* Set up the font list for console. */
 	efi_init_environment();
