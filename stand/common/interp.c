@@ -39,6 +39,10 @@ __FBSDID("$FreeBSD$");
 
 #define	MAXARGS	20			/* maximum number of arguments allowed */
 
+#if defined(EFI) && defined(LOADER_TPM2_PASSPHRASE)
+void destroy_crypto_info(void); // ../efi/loader/tpm2.c
+#endif
+
 /*
  * Interactive mode
  */
@@ -59,6 +63,14 @@ interact(void)
 	 */
 	interp_identifier = bootprog_interp;
 	interp_init();
+
+#if defined(EFI) && defined(LOADER_TPM2_PASSPHRASE)
+	if (getenv("kern.geom.eli.passphrase.from_tpm2.was_retrieved")[0] == '1') {
+		// we cannot allow any interaction
+		destroy_crypto_info();
+		exit(-1);
+	}
+#endif
 
 	printf("\n");
 
