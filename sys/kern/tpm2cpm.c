@@ -18,6 +18,7 @@
 #include <sys/uio.h>
 #include <sys/iov.h>
 #include <crypto/sha2/sha256.h>
+#include <sys/eventhandler.h>
 
 
 static int mypanic(const char *msg) {
@@ -39,9 +40,8 @@ static void sha256_digest_make_human_readable(const unsigned char *digest, char 
 	digest_human_readable[2 * SHA256_DIGEST_LENGTH] = '\0';
 }
 
-void tpm2_check_passphrase_marker(void);
 
-void tpm2_check_passphrase_marker(void) {
+static void tpm2_check_passphrase_marker(void *param) {
 	struct thread *td = curthread;
 
 	int error;
@@ -122,3 +122,11 @@ void tpm2_check_passphrase_marker(void) {
 		printf("Failed to close passphrase marker - that's weird.\n");
 	}
 }
+
+
+static void tpm2cpm_init(void *param) {
+	EVENTHANDLER_REGISTER(mountroot, tpm2_check_passphrase_marker, NULL, EVENTHANDLER_PRI_FIRST);
+}
+
+
+SYSINIT(tpm2cpm_init, SI_SUB_EVENTHANDLER + 1, SI_ORDER_ANY, tpm2cpm_init, NULL);
