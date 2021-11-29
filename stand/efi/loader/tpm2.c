@@ -11,6 +11,10 @@
 
 #include <crypto/sha2/sha256.h>
 
+
+#define TPM2_PAUSE_BEFORE_EXIT 10
+
+
 static EFI_GUID tcg2_protocol = EFI_TCG2_PROTOCOL_GUID;
 static EFI_TCG2_PROTOCOL *tcg2 = NULL;
 
@@ -290,18 +294,45 @@ void tpm2_check_efivars() {
 }
 
 
-void tpm2_retrieve_passphrase() {
-	if (!try_retrieve_passphrase_from_tpm)
-		return;
+static void zero_env_var(const char *name) {
+	struct env_var *ev = env_getenv(name);
+	if (ev != NULL) {
+		char *zerome = ev->ev_value;
+		while (*zerome) {
+			*zerome++ = '\0';
+		}
+	}
+}
 
-	printf("Trying to retrieve passphrase from TPM...\n");
 
+void destroy_crypto_info() {
+	explicit_bzero(&passphrase_from_nvindex, sizeof(passphrase_from_nvindex));
+	zero_env_var("kern.geom.eli.passphrase");
+	zero_env_var("kern.geom.eli.passphrase.from_tpm2.passphrase");
+	struct keybuf *freeme = (struct keybuf*) malloc(sizeof(struct keybuf) + sizeof(struct keybuf_ent) * GELI_MAX_KEYS);
+	freeme->kb_nents = GELI_MAX_KEYS;
+	for (unsigned int i = 0; i < GELI_MAX_KEYS; i++) {
+		freeme->kb_ents[i].ke_type = KEYBUF_TYPE_GELI;
+		explicit_bzero(&freeme->kb_ents[i].ke_data[0], MAX_KEY_BYTES);
+	}
+	geli_import_key_buffer(freeme);
+	(void)free(freeme);
+}
+
+
+static void pause_and_exit(EFI_STATUS status) {
+	destroy_crypto_info();
+	pause(TPM2_PAUSE_BEFORE_EXIT);
+	efi_exit(status);
+}
+
+
+static EFI_STATUS tpm2_start_policy_session(TPMI_SH_AUTH_SESSION *SessionHandle) {
 	EFI_STATUS status;
 
 	TPM2B_DIGEST NonceCaller = { 16 };
 	TPM2B_ENCRYPTED_SECRET Salt = { 0 };
 	TPMT_SYM_DEF Symmetric = { TPM_ALG_NULL };
-	TPMI_SH_AUTH_SESSION SessionHandle;
 	TPM2B_NONCE NonceTPM;
 	status = Tpm2StartAuthSession (
 	    TPM_RH_NULL,	// TpmKey
@@ -311,12 +342,12 @@ void tpm2_retrieve_passphrase() {
 	    TPM_SE_POLICY,	// SessionType
 	    &Symmetric,
 	    TPM_ALG_SHA256,	//AuthHash
-	    &SessionHandle,
+	    SessionHandle,
 	    &NonceTPM
 	);
 	if (status != EFI_SUCCESS) {
 		printf("Tpm2StartAuthSession() failed - 0x%lx.\n", status);
-		return;
+		return status;
 	}
 
 	TPM2B_DIGEST PcrDigest = { .size = 0 };
@@ -327,12 +358,31 @@ void tpm2_retrieve_passphrase() {
 	    }
 	};
 	status = Tpm2PolicyPCR(
-	    SessionHandle, 	// PolicySession
+	    *SessionHandle, 	// PolicySession
 	    &PcrDigest,
 	    &Pcrs
 	);
 	if (status != EFI_SUCCESS) {
 		printf("Tpm2PolicyPCR() failed - 0x%lx.\n", status);
+		return status;
+	}
+
+	return EFI_SUCCESS;
+}
+
+
+void tpm2_retrieve_passphrase() {
+	if (!try_retrieve_passphrase_from_tpm)
+		return;
+
+	printf("Trying to retrieve passphrase from TPM...\n");
+
+	EFI_STATUS status;
+
+	TPMI_SH_AUTH_SESSION SessionHandle;
+	status = tpm2_start_policy_session(&SessionHandle);
+	if (status != EFI_SUCCESS) {
+		printf("tpm2_start_policy_session() failed - 0x%lx.\n", status);
 		return;
 	}
 
@@ -366,26 +416,19 @@ void tpm2_retrieve_passphrase() {
 	setenv("kern.geom.eli.passphrase", passphrase_from_nvindex.buffer, 1);
 	passphrase_was_retrieved = 1;
 	setenv("kern.geom.eli.passphrase.from_tpm2.was_retrieved", "1", 1);
-}
 
+	status = tpm2_start_policy_session(&SessionHandle);
+	if (status != EFI_SUCCESS) {
+		printf("tpm2_start_policy_session() failed - 0x%lx.\n", status);
+		return;
+	}
 
-void destroy_crypto_info() {
-	explicit_bzero(&passphrase_from_nvindex, sizeof(passphrase_from_nvindex));
-	struct env_var *ev = env_getenv("kern.geom.eli.passphrase");
-	if (ev != NULL) {
-		char *zerome = ev->ev_value;
-		while (*zerome) {
-			*zerome++ = '\0';
-		}
+	AuthSession.sessionHandle = SessionHandle;
+	status = Tpm2NvReadLock(nvindex, nvindex, &AuthSession);
+	if (status != EFI_SUCCESS) {
+		printf("Tpm2NvReadLock() failed - 0x%lx.\n", status);
+		pause_and_exit(EFI_DEVICE_ERROR);
 	}
-	struct keybuf *freeme = (struct keybuf*) malloc(sizeof(struct keybuf) + sizeof(struct keybuf_ent) * GELI_MAX_KEYS);
-	freeme->kb_nents = GELI_MAX_KEYS;
-	for (unsigned int i = 0; i < GELI_MAX_KEYS; i++) {
-		freeme->kb_ents[i].ke_type = KEYBUF_TYPE_GELI;
-		explicit_bzero(&freeme->kb_ents[i].ke_data[0], MAX_KEY_BYTES);
-	}
-	geli_import_key_buffer(freeme);
-	(void)free(freeme);
 }
 
 
@@ -410,7 +453,7 @@ void tpm2_check_passphrase_marker() {
 	int fd;
 	struct stat st;
 	BYTE buf[SHA256_DIGEST_LENGTH * 2 + 1];
-	const int timeout = 3;
+	const int timeout = TPM2_PAUSE_BEFORE_EXIT;
 	SHA256_CTX ctx;
 	unsigned char digest[SHA256_DIGEST_LENGTH];
 	char digest_human_readable[SHA256_DIGEST_LENGTH * 2 + 1];
@@ -476,7 +519,5 @@ void tpm2_check_passphrase_marker() {
 	return;
 
 exit_timeout:
-	destroy_crypto_info();
-	pause(timeout);
-	efi_exit(EFI_NOT_FOUND);
+	pause_and_exit(EFI_NOT_FOUND);
 }
