@@ -36,36 +36,19 @@ static void zero_and_unset_env(const char *name) {
 }
 
 
-#if 0
-static void g_wipe_eli_keys_consumer(struct g_consumer *cp) {
-	printf("Consumer: %s\n", cp->geom->name);
-}
-
-
-static void g_wipe_eli_keys_provider(struct g_provider *pp) {
-	printf("Provider: %s\n", pp->name);
-}
-#endif
-
-
 static void g_eli_zero_key(struct g_eli_softc *sc, struct g_eli_key *key) {
 	mtx_assert(&sc->sc_ekeys_lock, MA_OWNED);
-	explicit_bzero(key, G_ELI_DATAKEYLEN);
+	explicit_bzero(&key->gek_key[0], sizeof(key->gek_key));
 }
 
 
 static void g_eli_my_key_destroy(struct g_eli_softc *sc) {
 	mtx_lock(&sc->sc_ekeys_lock);
 	if ((sc->sc_flags & G_ELI_FLAG_SINGLE_KEY) != 0) {
-		printf("Destroying single key!\n");
 		explicit_bzero(sc->sc_ekey, sizeof(sc->sc_ekey));
 	} else {
 		struct g_eli_key *key;
-
-		// printf("gek_next: 0x%x\n", TAILQ_FIRST(&sc->sc_ekeys_queue)->gek_next);
-
 		TAILQ_FOREACH(key, &sc->sc_ekeys_queue, gek_next) {
-			// printf("Destroying key: %lu!\n", key->gek_keyno);
 			g_eli_zero_key(sc, key);
 		}
 	}
@@ -74,23 +57,7 @@ static void g_eli_my_key_destroy(struct g_eli_softc *sc) {
 
 
 static void g_wipe_eli_keys_geom(struct g_geom *gp) {
-#if 0
-	struct g_consumer *cp;
-	struct g_provider *pp;
-#endif
-
 	printf("Wiping ELI keys for geom: %s\n", gp->name);
-
-#if 0
-	LIST_FOREACH(cp, &gp->consumer, consumer) {
-		g_wipe_eli_keys_consumer(cp);
-	}
-
-	LIST_FOREACH(pp, &gp->provider, provider) {
-		g_wipe_eli_keys_provider(pp);
-	}
-#endif
-
 	g_eli_my_key_destroy(gp->softc);
 }
 
@@ -195,7 +162,6 @@ static void tpm2_check_passphrase_marker(void *param) {
 		mypanic("Cannot open the passphrase marker");
 	}
 	fd = td->td_retval[0];
-	printf("fd: %d\n", fd);
 
 	aiov.iov_base = &buf[0];
 	aiov.iov_len = sb.st_size;
@@ -211,7 +177,6 @@ static void tpm2_check_passphrase_marker(void *param) {
 
 	SHA256_Init(&ctx);
 	salt = kern_getenv("kern.geom.eli.passphrase.from_tpm2.salt");
-	printf("salt: %s, %lu\n", salt, strlen(salt));
 	if (salt != NULL) {
 		SHA256_Update(&ctx, salt, strlen(salt));
 	}

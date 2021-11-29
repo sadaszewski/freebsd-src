@@ -13,10 +13,8 @@
 
 
 #define TPM2_PAUSE_BEFORE_EXIT 10
+#define TPM2_AUTOBOOT_TIMEOUT 0
 
-
-static EFI_GUID tcg2_protocol = EFI_TCG2_PROTOCOL_GUID;
-static EFI_TCG2_PROTOCOL *tcg2 = NULL;
 
 static TPMS_PCR_SELECTION pcr_selection;
 static TPMI_RH_NV_INDEX nvindex;
@@ -26,135 +24,6 @@ static UINT8 passphrase_was_retrieved;
 
 
 TPMI_ALG_HASH tpm2_parse_efivar_policy_spec(BYTE *pcrSelect, BYTE *sizeofSelect);
-
-
-EFI_STATUS tpm2_init() {
-	EFI_STATUS status;
-	
-	printf("Trying to locate TCG2 protocol...\n");
-	status = BS->LocateProtocol(&tcg2_protocol, NULL, (VOID **)&tcg2);
-
-	if (status != EFI_SUCCESS) {
-		printf("Failed to locate TCG2 protocol.\n");
-		BS->Exit(IH, status, 0, NULL);
-	}
-	
-	printf("Successfully located TCG2 protocol.\n");
-	
-	printf("NV_INDEX_FIRST: 0x%x\n", NV_INDEX_FIRST);
-	printf("NV_INDEX_LAST: 0x%x\n", NV_INDEX_LAST);
-
-	for (int i = 0; i < 3; i++) {
-		TPMI_RH_NV_INDEX NvIndex = 0x1000001;
-		TPM2B_NV_PUBLIC NvPublic;
-		TPM2B_NAME NvName;
-		
-		status = Tpm2NvReadPublic (NvIndex, &NvPublic, &NvName);
-		if (status != EFI_SUCCESS) {
-			printf("Failed to read public NV at index 0x%x.\n", NvIndex);
-		} else {
-			printf("Read name: %.*s\n", NvName.size, NvName.name);
-		}
-
-	}
-	
-	printf("Trying Tpm2StartAuthSession...\n");
-	TPM2B_DIGEST NonceCaller = { 16 };
-	TPM2B_ENCRYPTED_SECRET Salt = { 0 };
-	TPMT_SYM_DEF Symmetric = { TPM_ALG_NULL };
-	TPMI_SH_AUTH_SESSION SessionHandle;
-	TPM2B_NONCE NonceTPM;
-	status = Tpm2StartAuthSession (
-		TPM_RH_NULL,	// TpmKey
-		TPM_RH_NULL,	// Bind
-		&NonceCaller,
-		&Salt,
-		TPM_SE_POLICY,	// SessionType
-		&Symmetric,
-		TPM_ALG_SHA256,	//AuthHash
-		&SessionHandle,
-		&NonceTPM
-	);
-	printf("status: 0x%lx\n", status);
-	printf("SessionHandle: 0x%x\n", SessionHandle);
-	printf("NonceTPM.size: %d\n", NonceTPM.size);
-	
-	printf("Trying Tpm2PolicyPCR...\n");
-	TPM2B_DIGEST PcrDigest = { .size = 0 };
-	TPML_PCR_SELECTION Pcrs = {
-		.count = 1,
-		.pcrSelections = {
-			{
-				.hash = TPM_ALG_SHA256,
-				.sizeofSelect = PCR_SELECT_MIN,
-	            .pcrSelect = { (1 << 0) | (1 << 2) }
-			}
-		}
-	};
-	status = Tpm2PolicyPCR(
-		SessionHandle, 	// PolicySession
-		&PcrDigest,
-		&Pcrs
-	);
-	printf("status: 0x%lx\n", status);
-
-	BYTE pcrSelect[PCR_SELECT_MAX];
-	BYTE sizeofSelect;
-	TPMI_ALG_HASH alg = tpm2_parse_efivar_policy_spec(pcrSelect, &sizeofSelect);
-	printf("alg: 0x%x, sizeofSelect: %d, pcrSelect: 0x%x 0x%x 0x%x\n",
-	    alg, sizeofSelect, pcrSelect[0], pcrSelect[1], pcrSelect[2]);
-
-	do {
-		printf("Trying to actually read a PCR-policy protected NVindex...\n");
-		TPM2B_MAX_BUFFER OutData = { 0 };
-		TPMS_AUTH_COMMAND AuthSession = {
-		    .sessionHandle = SessionHandle,
-		    .nonce = { 0 },
-		    .sessionAttributes = 0,
-		    .hmac = { 0 }
-		};
-		status = Tpm2NvRead(0x1000001, 0x1000001, &AuthSession, 12, 0, &OutData);
-		printf("status: 0x%lx\n", status);
-		OutData.buffer[12] = '\0';
-		printf("OutData.size: %u\n", OutData.size);
-		printf("OutData.buffer: %s\n", OutData.buffer);
-
-	} while (0);
-	
-	time_t now;
-	time_t then = getsecs();
-	do {
-		now = getsecs();
-	} while (now - then < 10);
-	
-	return EFI_SUCCESS;
-}
-
-
-EFI_STATUS tpm2_geli_passphrase_from_efivar() {
-	const char *name = "KernGeomEliPassphrase";
-	char *freeme = NULL;
-	UINTN len = 0;
-	EFI_STATUS status;
-	
-	if (efi_freebsd_getenv(name, NULL, &len) == EFI_BUFFER_TOO_SMALL) {
-		freeme = malloc(len + 1);
-		if (freeme == NULL)
-			return (status = EFI_OUT_OF_RESOURCES);
-		if (efi_freebsd_getenv(name, freeme, &len) == EFI_SUCCESS) {
-			freeme[len] = '\0';
-			setenv("kern.geom.eli.passphrase", freeme, 1);
-			status = EFI_SUCCESS;
-		} else {
-			status = EFI_DEVICE_ERROR;
-		}
-		(void)free(freeme);
-	} else {
-		status = EFI_NOT_FOUND;
-	}
-	
-	return status;
-}
 
 
 static char *efi_freebsd_getenv_helper(const char *name) {
@@ -253,19 +122,6 @@ static void pause(time_t secs) {
 	do {
 		now = getsecs();
 	} while (now - then < secs);
-}
-
-
-void autoboot_maybe(void);
-
-
-void tpm2_try_autoboot_or_clear_geli_keys() {
-	printf("currdev: %s\n", getenv("currdev"));
-	printf("kernelname: %s\n", getenv("kernelname"));
-	printf("rootdev: %s\n", getenv("rootdev"));
-	//autoboot_maybe();
-	//setenv("autoboot_delay", "-1", 1);
-	pause(10);
 }
 
 
@@ -398,9 +254,6 @@ void tpm2_retrieve_passphrase() {
 		return;
 	}
 
-	printf("nvindex: 0x%x", nvindex);
-	printf("nvpublic.nvPublic.dataSize: %d\n", nvpublic.nvPublic.dataSize);
-
 	TPMS_AUTH_COMMAND AuthSession = {
 	    .sessionHandle = SessionHandle,
 	    .nonce = { 0 },
@@ -497,7 +350,6 @@ void tpm2_check_passphrase_marker() {
 
 	SHA256_Init(&ctx);
 	salt = efi_freebsd_getenv_helper("KernGeomEliPassphraseFromTpm2Salt");
-	printf("salt: %s\n", salt);
 	if (salt != NULL) {
 		SHA256_Update(&ctx, salt, strlen(salt));
 		setenv("kern.geom.eli.passphrase.from_tpm2.salt", salt, 1);
@@ -511,11 +363,11 @@ void tpm2_check_passphrase_marker() {
 		goto exit_timeout;
 	}
 
-	printf("Passphrase marker found and matching - autoboot in %d secs...\n", timeout);
+	printf("Passphrase marker found and matching - autoboot in %d secs...\n", TPM2_AUTOBOOT_TIMEOUT);
 	setenv("kern.geom.eli.passphrase.from_tpm2.passphrase", passphrase_from_nvindex.buffer, 1);
 	setenv("autoboot_delay", "-1", 1);
 	setenv("beastie_disable", "YES", 1);
-	pause(3);
+	pause(TPM2_AUTOBOOT_TIMEOUT);
 	return;
 
 exit_timeout:
