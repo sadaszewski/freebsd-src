@@ -432,6 +432,19 @@ void tpm2_retrieve_passphrase() {
 }
 
 
+void tpm2_check_retrieved() {
+	if (passphrase_was_retrieved)
+		return;
+	char *required = efi_freebsd_getenv_helper("KernGeomEliPassphraseFromTpm2Required");
+	if (required && required[0] == '1') {
+		(void)free(required);
+		printf("KernGeomEliPassphraseFromTpm2Required is set but no passphrase was retrieved, rebooting...");
+		pause_and_exit(EFI_NOT_FOUND);
+	}
+	(void)free(required);
+}
+
+
 static void tpm2_sha256(const char *data, size_t n, char *digest) {
 	SHA256_CTX ctx;
 
@@ -501,6 +514,7 @@ void tpm2_check_passphrase_marker() {
 	if (salt != NULL) {
 		SHA256_Update(&ctx, salt, strlen(salt));
 		setenv("kern.geom.eli.passphrase.from_tpm2.salt", salt, 1);
+		(void)free(salt);
 	}
 	SHA256_Update(&ctx, passphrase_from_nvindex.buffer, passphrase_from_nvindex.size);
 	SHA256_Final(digest, &ctx);
