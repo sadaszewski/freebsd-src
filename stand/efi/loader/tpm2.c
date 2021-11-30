@@ -1,3 +1,13 @@
+/*-
+ * SPDX-License-Identifier: BSD-4-Clause
+ *
+ * Copyright (c) 2021 Stanislaw R. Adaszewski
+ * All rights reserved.
+ *
+ *	@(#)tpm2cpm.c	13.0 (Villeneuve) 11/27/21
+ */
+
+
 #include "efitpm2.h"
 #include "efitpm2nv.h"
 
