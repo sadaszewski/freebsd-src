@@ -47,5 +47,7 @@ EFI_STATUS Tpm2PcrExtend (
     TPML_DIGEST_VALUES  *Digests
 );
 
+EFI_STATUS Tpm2LocateProtocol();
+
 #endif
 
