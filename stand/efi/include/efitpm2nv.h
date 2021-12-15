@@ -42,5 +42,10 @@ EFI_STATUS Tpm2NvReadLock (
     TPMS_AUTH_COMMAND	*AuthSession
 );
 
+EFI_STATUS Tpm2PcrExtend (
+    TPMI_DH_PCR         PcrHandle,
+    TPML_DIGEST_VALUES  *Digests
+);
+
 #endif
 
