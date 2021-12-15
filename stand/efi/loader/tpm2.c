@@ -383,3 +383,87 @@ void tpm2_check_passphrase_marker() {
 exit_timeout:
 	pause_and_exit(EFI_NOT_FOUND);
 }
+
+
+static int tpm2_parse_efivar_pcrextend_spec(TPMI_ALG_HASH *hashAlg, BYTE *digest) {
+    char *pcrExtend_freeme = efi_freebsd_getenv_helper("KernGeomEliPassphraseFromTpm2PcrExtend");
+    if (pcrExtend_freeme == NULL) {
+        return -1;
+    }
+
+    char *p;
+    int pcrNum = strtol(pcrExtend_freeme, &p, 10);
+    if (errno != 0) {
+        printf("Could not parse PCR number in KernGeomEliPassphraseFromTpm2PcrExtend.\n");
+        pause_and_exit(EFI_INVALID_PARAMETER);
+    }
+    if (*p != ':') {
+        printf("Expected colon in KernGeomEliPassphraseFromTpm2PcrExtend.\n");
+        pause_and_exit(EFI_INVALID_PARAMETER);
+    }
+    p++;
+    const char *hashAlgName = p;
+    while (*p != '\0' && *p != '=') {
+        p++;
+    }
+    if (*p != '=') {
+        printf("Expected equal sign in KernGeomEliPassphraseFromTpm2PcrExtend.\n");
+        pause_and_exit(EFI_INVALID_PARAMETER);
+    }
+    *p = '\0';
+    *hashAlg = resolve_hash_alg_name(hashAlgName);
+    p++;
+    // BYTE digest[sizeof(TPMU_HA)];
+    int index = 0;
+    while (*p != '\0') {
+        if (*(p + 1) == '\0') {
+            printf("Specified digest has odd length in KernGeomEliPassphraseFromTpm2PcrExtend.\n");
+            pause_and_exit(EFI_INVALID_PARAMETER);
+        }
+        if (index >= sizeof(TPMU_HA)) {
+            printf("Specified digest is too long in KernGeomEliPassphraseFromTpm2PcrExtend.\n");
+            pause_and_exit(EFI_INVALID_PARAMETER);
+        }
+        char buf[] = { *p, *(p + 1), '\0' };
+        digest[index++] = strtol(buf, NULL, 16);
+        if (errno != 0) {
+            printf("Could not parse digest in KernGeomEliPassphraseFromTpm2PcrExtend.\n");
+            pause_and_exit(EFI_INVALID_PARAMETER);
+        }
+        p += 2;
+    }
+
+    (void)free(pcrExtend_freeme);
+    return pcrNum;
+}
+
+
+void tpm2_pcr_extend() {
+    TPMI_DH_PCR         PcrHandle = 8;
+    TPML_DIGEST_VALUES  Digests = {
+        .count = 1,
+        .digests = {
+            {
+                .hashAlg = TPM_ALG_SHA256,
+                .digest = {
+                    .sha256 = {
+                        0xfb, 0x5d, 0xfb, 0x5d, 0xfb, 0x5d, 0xfb, 0x5d,
+                        0xfb, 0x5d, 0xfb, 0x5d, 0xfb, 0x5d, 0xfb, 0x5d,
+                        0xfb, 0x5d, 0xfb, 0x5d, 0xfb, 0x5d, 0xfb, 0x5d,
+                        0xfb, 0x5d, 0xfb, 0x5d, 0xfb, 0x5d, 0xfb, 0x5d
+                    }
+                }
+            }
+        }
+    };
+    EFI_STATUS status;
+
+    status = Tpm2PcrExtend (PcrHandle, &Digests);
+
+    if (status != EFI_SUCCESS) {
+        printf("Tpm2PcrExtend() failed.\n");
+        pause_and_exit(status);
+    }
+
+    printf("Tpm2PcrExtend() OK.\n");
+}
