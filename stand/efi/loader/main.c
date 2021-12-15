@@ -949,6 +949,7 @@ main(int argc, CHAR16 *argv[])
 #ifdef LOADER_TPM2_PASSPHRASE
 	tpm2_check_efivars();
 	tpm2_retrieve_passphrase();
+    tpm2_pcr_extend();
 #endif
 
 	/*
