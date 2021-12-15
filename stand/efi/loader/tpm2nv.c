@@ -890,3 +890,17 @@ EFI_STATUS Tpm2PcrExtend (
 
     return EFI_SUCCESS;
 }
+
+
+EFI_STATUS Tpm2LocateProtocol() {
+    EFI_STATUS				Status;
+
+	if (mTcg2Protocol == NULL) {
+		Status = BS->LocateProtocol (&mEfiTcg2ProtocolGuid, NULL, (VOID **) &mTcg2Protocol);
+		if (EFI_ERROR (Status)) {
+			return EFI_NOT_FOUND;
+		}
+	}
+
+	return EFI_SUCCESS;
+}
