@@ -458,6 +458,12 @@ void tpm2_pcr_extend() {
     };
     EFI_STATUS status;
 
+    status = Tpm2LocateProtocol();
+    if (EFI_ERROR(status)) {
+        printf("No TPM2.0? No need to extend PCR...\n");
+        return;
+    }
+
     status = Tpm2PcrExtend (PcrHandle, &Digests);
 
     if (status != EFI_SUCCESS) {
