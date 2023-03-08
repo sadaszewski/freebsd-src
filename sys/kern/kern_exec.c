@@ -307,17 +307,8 @@ pre_execve(struct thread *td, struct vmspace **oldvmspace)
 	p = td->td_proc;
 	if ((p->p_flag & P_HADTHREADS) != 0) {
 		PROC_LOCK(p);
-		while (p->p_singlethr > 0) {
-			error = msleep(&p->p_singlethr, &p->p_mtx,
-			    PWAIT | PCATCH, "exec1t", 0);
-			if (error != 0) {
-				error = ERESTART;
-				goto unlock;
-			}
-		}
 		if (thread_single(p, SINGLE_BOUNDARY) != 0)
 			error = ERESTART;
-unlock:
 		PROC_UNLOCK(p);
 	}
 	KASSERT(error != 0 || (td->td_pflags & TDP_EXECVMSPC) == 0,
@@ -483,7 +474,7 @@ interpret:
 		 * pointer in ni_vp among other things.
 		 */
 		NDINIT(&nd, LOOKUP, ISOPEN | LOCKLEAF | LOCKSHARED | FOLLOW |
-		    SAVENAME | AUDITVNODE1 | WANTPARENT, UIO_SYSSPACE,
+		    AUDITVNODE1 | WANTPARENT, UIO_SYSSPACE,
 		    args->fname);
 
 		error = namei(&nd);
@@ -513,6 +504,18 @@ interpret:
 				imgp->execpath = args->fname;
 			vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		}
+	} else if (imgp->interpreter_vp) {
+		/*
+		 * An image activator has already provided an open vnode
+		 */
+		newtextvp = imgp->interpreter_vp;
+		imgp->interpreter_vp = NULL;
+		if (vn_fullpath(newtextvp, &imgp->execpath,
+		    &imgp->freepath) != 0)
+			imgp->execpath = args->fname;
+		vn_lock(newtextvp, LK_SHARED | LK_RETRY);
+		AUDIT_ARG_VNODE1(newtextvp);
+		imgp->vp = newtextvp;
 	} else {
 		AUDIT_ARG_FD(args->fd);
 
@@ -711,7 +714,11 @@ interpret:
 		free(imgp->freepath, M_TEMP);
 		imgp->freepath = NULL;
 		/* set new name to that of the interpreter */
-		args->fname = imgp->interpreter_name;
+		if (imgp->interpreter_vp) {
+			args->fname = NULL;
+		} else {
+			args->fname = imgp->interpreter_name;
+		}
 		goto interpret;
 	}
 

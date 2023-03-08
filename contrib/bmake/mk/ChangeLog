@@ -1,3 +1,66 @@
+2023-01-29  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* autoconf.mk: hook config.status to beforebuild.
+
+	* whats.mk: what*.c is NOTMAIN
+
+2023-01-27  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230127
+	control umask so directories are created with suitable mode.
+
+2023-01-20  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230120
+
+	* sys.vars.mk: add M_On and M_Onr also cleanup to be more
+	consistent wrt testing MAKE_VERSION
+
+2023-01-12  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230112
+
+	* meta2deps.{py,sh}: assert if filemon data is truncated
+	we should see the '# Bye bye' record - assert if we do not.
+
+2022-09-09  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220909
+
+	* sys/Linux.mk set EGREP to grep -E to avoid deprecation warnings
+
+2022-09-06  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* dirdeps-options.mk: explain the need to use
+	${DEP_${TARGET_SPEC_VAR}:U${TARGET_SPEC_VAR}} when refering to
+	${TARGET_SPEC_VAR}
+
+2022-09-03  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220903
+	
+	* M_cmpv handle more than 3 dots and clear leading 0's
+
+2022-07-20  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220720
+
+	* prog.mk: handle PROG_CXX for more than just NetBSD
+
+2022-06-20  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220620
+
+	* yacc.mk: when we have *.y in SRCS used explicit rules and .ORDER
+	rather than just suffix rules
+
+2022-04-23  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220422
+
+	* gendirdeps.mk: If LOCAL_DEPENDS_GUARD is set to "no"
+	do not capture any local depends in Makefile.depend
+
 2022-03-25  Simon J Gerraty  <sjg@beast.crufty.net>
 
 	* install-mk (MK_VERSION): 20220323

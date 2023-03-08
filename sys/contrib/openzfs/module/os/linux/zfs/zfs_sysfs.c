@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -279,11 +279,11 @@ zprop_sysfs_show(const char *attr_name, const zprop_desc_t *property,
 
 		for (int i = 0; i < ARRAY_SIZE(type_map); i++) {
 			if (type_map[i].ztm_type & property->pd_types)  {
-				len += snprintf(buf + len, buflen - len, "%s ",
-				    type_map[i].ztm_name);
+				len += kmem_scnprintf(buf + len, buflen - len,
+				    "%s ", type_map[i].ztm_name);
 			}
 		}
-		len += snprintf(buf + len, buflen - len, "\n");
+		len += kmem_scnprintf(buf + len, buflen - len, "\n");
 		return (len);
 	}
 

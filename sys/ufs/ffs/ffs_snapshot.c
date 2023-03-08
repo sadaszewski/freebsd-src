@@ -201,7 +201,10 @@ ffs_snapshot(struct mount *mp, char *snapfile)
 	ufs2_daddr_t blockno;
 	uint64_t flag;
 	char saved_nice = 0;
-	long redo = 0, snaplistsize = 0;
+#ifdef DIAGNOSTIC
+	long redo = 0;
+#endif
+	long snaplistsize = 0;
 	int32_t *lp;
 	void *space;
 	struct fs *copy_fs = NULL, *fs;
@@ -223,15 +226,6 @@ ffs_snapshot(struct mount *mp, char *snapfile)
 	ump = VFSTOUFS(mp);
 	fs = ump->um_fs;
 	sn = NULL;
-	/*
-	 * At the moment, journaled soft updates cannot support
-	 * taking snapshots.
-	 */
-	if (MOUNTEDSUJ(mp)) {
-		vfs_mount_error(mp, "%s: Snapshots are not yet supported when "
-		    "running with journaled soft updates", fs->fs_fsmnt);
-		return (EOPNOTSUPP);
-	}
 	MNT_ILOCK(mp);
 	flag = mp->mnt_flag;
 	MNT_IUNLOCK(mp);
@@ -457,7 +451,9 @@ restart:
 	for (cg = 0; cg < fs->fs_ncg; cg++) {
 		if ((ACTIVECGNUM(fs, cg) & ACTIVECGOFF(cg)) != 0)
 			continue;
+#ifdef DIAGNOSTIC
 		redo++;
+#endif
 		error = UFS_BALLOC(vp, lfragtosize(fs, cgtod(fs, cg)),
 		    fs->fs_bsize, KERNCRED, 0, &nbp);
 		if (error)
@@ -684,7 +680,7 @@ loop:
 		*blkp++ = lblkno(fs, fs->fs_sblockloc);
 		blkno = fragstoblks(fs, fs->fs_csaddr);
 		for (cg = 0; cg < fs->fs_ncg; cg++) {
-			if (fragstoblks(fs, cgtod(fs, cg) > blkno))
+			if (fragstoblks(fs, cgtod(fs, cg)) > blkno)
 				break;
 			*blkp++ = fragstoblks(fs, cgtod(fs, cg));
 		}

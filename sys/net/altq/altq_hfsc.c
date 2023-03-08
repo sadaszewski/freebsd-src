@@ -63,6 +63,7 @@
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <netinet/in.h>
 
 #include <netpfil/pf/pf.h>
@@ -514,9 +515,9 @@ hfsc_class_create(struct hfsc_if *hif, struct service_curve *rsc,
 		if ((p = parent->cl_children) == NULL)
 			parent->cl_children = cl;
 		else {
-			while (p->cl_siblings != NULL)
-				p = p->cl_siblings;
-			p->cl_siblings = cl;
+			/* Put new class at beginning of list */
+			cl->cl_siblings = parent->cl_children;
+			parent->cl_children = cl;
 		}
 	}
 	IFQ_UNLOCK(hif->hif_ifq);

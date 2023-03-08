@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -369,6 +369,7 @@ range_tree_add_impl(void *arg, uint64_t start, uint64_t size, uint64_t fill)
 		 * invalid as soon as we do any mutating btree operations.
 		 */
 		rs_after = zfs_btree_find(&rt->rt_root, &tmp, &where_after);
+		ASSERT3P(rs_after, !=, NULL);
 		rs_set_start_raw(rs_after, rt, before_start);
 		rs_set_fill(rs_after, rt, after_fill + before_fill + fill);
 		rs = rs_after;

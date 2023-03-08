@@ -135,7 +135,7 @@ static struct vcpu_state *vcpu_state;
 static int cur_vcpu, stopped_vcpu;
 static bool gdb_active = false;
 
-const int gdb_regset[] = {
+static const int gdb_regset[] = {
 	VM_REG_GUEST_RAX,
 	VM_REG_GUEST_RBX,
 	VM_REG_GUEST_RCX,
@@ -162,7 +162,7 @@ const int gdb_regset[] = {
 	VM_REG_GUEST_GS
 };
 
-const int gdb_regsize[] = {
+static const int gdb_regsize[] = {
 	8,
 	8,
 	8,
@@ -958,7 +958,6 @@ static void
 gdb_read_regs(void)
 {
 	uint64_t regvals[nitems(gdb_regset)];
-	int i;
 
 	if (vm_get_register_set(ctx, cur_vcpu, nitems(gdb_regset),
 	    gdb_regset, regvals) == -1) {
@@ -966,7 +965,7 @@ gdb_read_regs(void)
 		return;
 	}
 	start_packet();
-	for (i = 0; i < nitems(regvals); i++)
+	for (size_t i = 0; i < nitems(regvals); i++)
 		append_unsigned_native(regvals[i], gdb_regsize[i]);
 	finish_packet();
 }
@@ -1704,15 +1703,18 @@ check_command(int fd)
 }
 
 static void
-gdb_readable(int fd, enum ev_type event, void *arg)
+gdb_readable(int fd, enum ev_type event __unused, void *arg __unused)
 {
+	size_t pending;
 	ssize_t nread;
-	int pending;
+	int n;
 
-	if (ioctl(fd, FIONREAD, &pending) == -1) {
+	if (ioctl(fd, FIONREAD, &n) == -1) {
 		warn("FIONREAD on GDB socket");
 		return;
 	}
+	assert(n >= 0);
+	pending = n;
 
 	/*
 	 * 'pending' might be zero due to EOF.  We need to call read
@@ -1743,14 +1745,14 @@ gdb_readable(int fd, enum ev_type event, void *arg)
 }
 
 static void
-gdb_writable(int fd, enum ev_type event, void *arg)
+gdb_writable(int fd, enum ev_type event __unused, void *arg __unused)
 {
 
 	send_pending_data(fd);
 }
 
 static void
-new_connection(int fd, enum ev_type event, void *arg)
+new_connection(int fd, enum ev_type event __unused, void *arg)
 {
 	int optval, s;
 
@@ -1804,7 +1806,7 @@ new_connection(int fd, enum ev_type event, void *arg)
 }
 
 #ifndef WITHOUT_CAPSICUM
-void
+static void
 limit_gdb_socket(int s)
 {
 	cap_rights_t rights;

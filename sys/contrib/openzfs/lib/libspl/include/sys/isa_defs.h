@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -227,8 +227,12 @@ extern "C" {
  * RISC-V arch specific defines
  * only RV64G (including atomic) LP64 is supported yet
  */
-#elif defined(__riscv) && defined(_LP64) && _LP64 && \
+#elif defined(__riscv) && defined(__riscv_xlen) && __riscv_xlen == 64 && \
 	defined(__riscv_atomic) && __riscv_atomic
+
+#if !defined(_LP64)
+#define	_LP64 1
+#endif
 
 #ifndef	__riscv__
 #define	__riscv__

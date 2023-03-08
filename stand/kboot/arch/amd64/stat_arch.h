@@ -1,10 +1,12 @@
 /*
  * Copyright (c) 2005-2020 Rich Felker, et al.
  *
- * SPDX-Licnse-Identifier: MIT
+ * SPDX-License-Identifier: MIT
  *
  * Note: From the musl project
  */
+
+typedef uint64_t host_nlink_t;
 
 struct host_kstat {
 	host_dev_t st_dev;

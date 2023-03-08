@@ -1635,7 +1635,8 @@ fg_update_strokes(struct atp_softc *sc, fg_pspan *pspans_x,
  * Return true if any movement is detected.
  */
 static boolean_t
-wsp_update_strokes(struct atp_softc *sc, wsp_finger_t *fingers, u_int n_fingers)
+wsp_update_strokes(struct atp_softc *sc, wsp_finger_t fingers[WSP_MAX_FINGERS],
+    u_int n_fingers)
 {
 	boolean_t movement = false;
 	atp_stroke_t *strokep_next;
@@ -2015,7 +2016,6 @@ atp_reap_sibling_zombies(void *arg)
 	u_int8_t n_touches_reaped = 0;
 	u_int8_t n_slides_reaped = 0;
 	u_int8_t n_horizontal_scrolls = 0;
-	u_int8_t n_vertical_scrolls = 0;
 	int horizontal_scroll = 0;
 	atp_stroke_t *strokep;
 	atp_stroke_t *strokep_next;
@@ -2034,8 +2034,6 @@ atp_reap_sibling_zombies(void *arg)
 			if (atp_is_horizontal_scroll(strokep)) {
 				n_horizontal_scrolls++;
 				horizontal_scroll += strokep->cum_movement_x;
-			} else if (atp_is_vertical_scroll(strokep)) {
-				n_vertical_scrolls++;
 			}
 		}
 

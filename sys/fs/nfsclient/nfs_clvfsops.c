@@ -1918,14 +1918,16 @@ nfs_sync(struct mount *mp, int waitfor)
 	}
 	MNT_IUNLOCK(mp);
 
+	if (waitfor == MNT_LAZY)
+		return (0);
+
 	/*
 	 * Force stale buffer cache information to be flushed.
 	 */
 loop:
 	MNT_VNODE_FOREACH_ALL(vp, mp, mvp) {
 		/* XXX Racy bv_cnt check. */
-		if (NFSVOPISLOCKED(vp) || vp->v_bufobj.bo_dirty.bv_cnt == 0 ||
-		    waitfor == MNT_LAZY) {
+		if (NFSVOPISLOCKED(vp) || vp->v_bufobj.bo_dirty.bv_cnt == 0) {
 			VI_UNLOCK(vp);
 			continue;
 		}
@@ -2131,8 +2133,8 @@ void nfscl_retopts(struct nfsmount *nmp, char *buffer, size_t buflen)
 	    ",noncontigwr", &buf, &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & (NFSMNT_NOLOCKD | NFSMNT_NFSV4)) ==
 	    0, ",lockd", &buf, &blen);
-	nfscl_printopt(nmp, (nmp->nm_flag & (NFSMNT_NOLOCKD | NFSMNT_NFSV4)) ==
-	    NFSMNT_NOLOCKD, ",nolockd", &buf, &blen);
+	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_NOLOCKD) != 0, ",nolockd",
+	    &buf, &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_RDIRPLUS) != 0, ",rdirplus",
 	    &buf, &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_KERB) == 0, ",sec=sys",

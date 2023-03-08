@@ -158,8 +158,6 @@ unit-tests/cond-token-var.exp
 unit-tests/cond-token-var.mk
 unit-tests/cond-undef-lint.exp
 unit-tests/cond-undef-lint.mk
-unit-tests/cond1.exp
-unit-tests/cond1.mk
 unit-tests/counter-append.exp
 unit-tests/counter-append.mk
 unit-tests/counter.exp
@@ -324,6 +322,10 @@ unit-tests/directive-export-literal.exp
 unit-tests/directive-export-literal.mk
 unit-tests/directive-export.exp
 unit-tests/directive-export.mk
+unit-tests/directive-for-break.exp
+unit-tests/directive-for-break.mk
+unit-tests/directive-for-empty.exp
+unit-tests/directive-for-empty.mk
 unit-tests/directive-for-errors.exp
 unit-tests/directive-for-errors.mk
 unit-tests/directive-for-escape.exp
@@ -402,8 +404,8 @@ unit-tests/impsrc.exp
 unit-tests/impsrc.mk
 unit-tests/include-main.exp
 unit-tests/include-main.mk
-unit-tests/include-sub.mk
-unit-tests/include-subsub.mk
+unit-tests/include-sub.inc
+unit-tests/include-subsub.inc
 unit-tests/job-flags.exp
 unit-tests/job-flags.mk
 unit-tests/job-output-long-lines.exp
@@ -650,6 +652,8 @@ unit-tests/var-op-sunsh.exp
 unit-tests/var-op-sunsh.mk
 unit-tests/var-op.exp
 unit-tests/var-op.mk
+unit-tests/var-readonly.exp
+unit-tests/var-readonly.mk
 unit-tests/var-recursive.exp
 unit-tests/var-recursive.mk
 unit-tests/var-scope-cmdline.exp
@@ -864,8 +868,6 @@ unit-tests/varparse-mod.exp
 unit-tests/varparse-mod.mk
 unit-tests/varparse-undef-partial.exp
 unit-tests/varparse-undef-partial.mk
-unit-tests/varquote.exp
-unit-tests/varquote.mk
 util.c
 var.c
 wait.h

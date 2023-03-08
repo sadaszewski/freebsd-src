@@ -38,6 +38,8 @@
 
 #define	MAXBUF	4096
 
+static int max_zevent_buf_len = 1 << 20;
+
 /*
  * Open the libzfs interface.
  */
@@ -69,6 +71,9 @@ zed_event_init(struct zed_conf *zcp)
 			return (-1);
 		zed_log_die("Failed to initialize disk events");
 	}
+
+	if (zcp->max_zevent_buf_len != 0)
+		max_zevent_buf_len = zcp->max_zevent_buf_len;
 
 	return (0);
 }
@@ -105,7 +110,7 @@ _bump_event_queue_length(void)
 {
 	int zzlm = -1, wr;
 	char qlen_buf[12] = {0}; /* parameter is int => max "-2147483647\n" */
-	long int qlen;
+	long int qlen, orig_qlen;
 
 	zzlm = open("/sys/module/zfs/parameters/zfs_zevent_len_max", O_RDWR);
 	if (zzlm < 0)
@@ -116,7 +121,7 @@ _bump_event_queue_length(void)
 	qlen_buf[sizeof (qlen_buf) - 1] = '\0';
 
 	errno = 0;
-	qlen = strtol(qlen_buf, NULL, 10);
+	orig_qlen = qlen = strtol(qlen_buf, NULL, 10);
 	if (errno == ERANGE)
 		goto done;
 
@@ -125,11 +130,21 @@ _bump_event_queue_length(void)
 	else
 		qlen *= 2;
 
-	if (qlen > INT_MAX)
-		qlen = INT_MAX;
+	/*
+	 * Don't consume all of kernel memory with event logs if something
+	 * goes wrong.
+	 */
+	if (qlen > max_zevent_buf_len)
+		qlen = max_zevent_buf_len;
+	if (qlen == orig_qlen)
+		goto done;
 	wr = snprintf(qlen_buf, sizeof (qlen_buf), "%ld", qlen);
+	if (wr >= sizeof (qlen_buf)) {
+		wr = sizeof (qlen_buf) - 1;
+		zed_log_msg(LOG_WARNING, "Truncation in %s()", __func__);
+	}
 
-	if (pwrite(zzlm, qlen_buf, wr, 0) < 0)
+	if (pwrite(zzlm, qlen_buf, wr + 1, 0) < 0)
 		goto done;
 
 	zed_log_msg(LOG_WARNING, "Bumping queue length to %ld", qlen);

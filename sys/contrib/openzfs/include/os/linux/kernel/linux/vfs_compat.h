@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -323,6 +323,19 @@ static inline void zfs_gid_write(struct inode *ip, gid_t gid)
 {
 	ip->i_gid = make_kgid(kcred->user_ns, gid);
 }
+
+/*
+ * 3.15 API change
+ */
+#ifndef RENAME_NOREPLACE
+#define	RENAME_NOREPLACE	(1 << 0) /* Don't overwrite target */
+#endif
+#ifndef RENAME_EXCHANGE
+#define	RENAME_EXCHANGE		(1 << 1) /* Exchange source and dest */
+#endif
+#ifndef RENAME_WHITEOUT
+#define	RENAME_WHITEOUT		(1 << 2) /* Whiteout source */
+#endif
 
 /*
  * 4.9 API change

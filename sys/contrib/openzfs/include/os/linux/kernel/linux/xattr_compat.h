@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -115,6 +115,20 @@ fn(struct dentry *dentry, const char *name, void *buffer, size_t size,	\
 {									\
 	return (__ ## fn(dentry->d_inode, name, buffer, size));		\
 }
+/*
+ * Android API change,
+ * The xattr_handler->get() callback was changed to take a dentry and inode
+ * and flags, because the dentry might not be attached to an inode yet.
+ */
+#elif defined(HAVE_XATTR_GET_DENTRY_INODE_FLAGS)
+#define	ZPL_XATTR_GET_WRAPPER(fn)					\
+static int								\
+fn(const struct xattr_handler *handler, struct dentry *dentry,		\
+    struct inode *inode, const char *name, void *buffer,		\
+    size_t size, int flags)						\
+{									\
+	return (__ ## fn(inode, name, buffer, size));			\
+}
 #else
 #error "Unsupported kernel"
 #endif
@@ -132,7 +146,7 @@ fn(const struct xattr_handler *handler, struct user_namespace *user_ns, \
     struct dentry *dentry, struct inode *inode, const char *name,	\
     const void *buffer, size_t size, int flags)	\
 {									\
-	return (__ ## fn(inode, name, buffer, size, flags));		\
+	return (__ ## fn(user_ns, inode, name, buffer, size, flags));	\
 }
 /*
  * 4.7 API change,
@@ -146,7 +160,7 @@ fn(const struct xattr_handler *handler, struct dentry *dentry,		\
     struct inode *inode, const char *name, const void *buffer,		\
     size_t size, int flags)						\
 {									\
-	return (__ ## fn(inode, name, buffer, size, flags));		\
+	return (__ ## fn(kcred->user_ns, inode, name, buffer, size, flags));\
 }
 /*
  * 4.4 API change,
@@ -160,7 +174,8 @@ static int								\
 fn(const struct xattr_handler *handler, struct dentry *dentry,		\
     const char *name, const void *buffer, size_t size, int flags)	\
 {									\
-	return (__ ## fn(dentry->d_inode, name, buffer, size, flags));	\
+	return (__ ## fn(kcred->user_ns, dentry->d_inode, name,	\
+	    buffer, size, flags));					\
 }
 /*
  * 2.6.33 API change,
@@ -173,7 +188,8 @@ static int								\
 fn(struct dentry *dentry, const char *name, const void *buffer,		\
     size_t size, int flags, int unused_handler_flags)			\
 {									\
-	return (__ ## fn(dentry->d_inode, name, buffer, size, flags));	\
+	return (__ ## fn(kcred->user_ns, dentry->d_inode, name,	\
+	    buffer, size, flags));					\
 }
 #else
 #error "Unsupported kernel"

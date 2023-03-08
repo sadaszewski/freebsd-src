@@ -94,7 +94,7 @@ static struct djswitch {
 	{"IS", "Iceland",       {1700, 11, 16}},
 	{"IT", "Italy",         {1582, 10,  4}},
 	{"JP", "Japan",         {1918, 12, 18}},
-	{"LI", "Lithuania",     {1918,  2,  1}},
+	{"LT", "Lithuania",     {1918,  2,  1}},
 	{"LU", "Luxembourg",    {1582, 12, 14}},
 	{"LV", "Latvia",        {1918,  2,  1}},
 	{"NL", "Netherlands",   {1582, 12, 14}},
@@ -930,7 +930,8 @@ mkmonthb(int y, int m, int jd_flag, struct monthlines *mlines)
 					dt.d = j - jan1 + 1;
 				else
 					sdateb(j, &dt);
-				if (j == highlightdate && !flag_nohighlight)
+				if (j == highlightdate && !flag_nohighlight
+				 && isatty(STDOUT_FILENO))
 					highlight(mlines->lines[i] + k,
 					    ds + dt.d * dw, dw, &l);
 				else

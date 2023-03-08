@@ -62,6 +62,8 @@
         ..
         test
         ..
+        timeout
+        ..
     ..
     cddl
         lib
@@ -253,6 +255,8 @@
                 amd64
                     arrays
                     ..
+                    kinst
+                    ..
                 ..
             ..
             zfsd
@@ -262,6 +266,8 @@
     etc
         rc.d
         ..
+    ..
+    examples
     ..
     games
     ..
@@ -426,6 +432,8 @@
             atf-sh
             ..
         ..
+        rc
+        ..
         rtld-elf
         ..
         tftpd
@@ -457,6 +465,8 @@
         ping
         ..
         route
+        ..
+        sysctl
         ..
     ..
     secure
@@ -751,6 +761,8 @@
         fs
             fusefs
             ..
+            tarfs
+            ..
             tmpfs
             ..
         ..
@@ -822,10 +834,14 @@
             tunnel
             ..
         ..
+        netlink
+        ..
         netmap
         ..
         netpfil
             common
+            ..
+            ipfw
             ..
             pf
                 ioctl
@@ -1056,6 +1072,8 @@
         ..
         mkimg
         ..
+        mktemp
+        ..
         ncal
         ..
         opensm
@@ -1067,6 +1085,8 @@
         printf
         ..
         procstat
+        ..
+        renice
         ..
         rs
         ..
@@ -1082,13 +1102,13 @@
         ..
         sort
         ..
+        split
+        ..
         stat
         ..
         tail
         ..
         tar
-        ..
-        timeout
         ..
         tr
         ..
@@ -1101,6 +1121,8 @@
         uniq
         ..
         vmstat
+        ..
+        wc
         ..
         xargs
         ..

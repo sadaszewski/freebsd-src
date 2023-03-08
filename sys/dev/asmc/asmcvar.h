@@ -110,6 +110,11 @@ struct asmc_softc {
 #define ASMC_SMS_INTSH		0x80	/* Shock Interrupt */
 
 /*
+ * Light Sensor.
+ */
+#define ASMC_ALSL_INT2A		0x2a	/* Ambient Light related Interrupt */
+
+/*
  * Keyboard backlight.
  */
 #define ASMC_KEY_LIGHTLEFT	"ALV0"	/* RO; 6 bytes */
@@ -204,13 +209,13 @@ struct asmc_softc {
 				  "Unknown", "Unknown", \
 				  "Wireless Module", }
 
-#define ASMC_MBP5_TEMPS		{ "TB0T", "TB1T", "TB2T", "TB3T", "TC0D", \
+#define ASMC_MBP51_TEMPS	{ "TB0T", "TB1T", "TB2T", "TB3T", "TC0D", \
 				  "TC0F", "TC0P", "TG0D", "TG0F", "TG0H", \
 				  "TG0P", "TG0T", "TG1H", "TN0D", "TN0P", \
 				  "TTF0", "Th2H", "Tm0P", "Ts0P", "Ts0S", \
 				  NULL }
 
-#define ASMC_MBP5_TEMPNAMES	{ "enclosure_bottom_0", "enclosure_bottom_1", \
+#define ASMC_MBP51_TEMPNAMES	{ "enclosure_bottom_0", "enclosure_bottom_1", \
 				  "enclosure_bottom_2", "enclosure_bottom_3", \
 				  "cpu_diode", "cpu", \
 				  "cpu_pin", "gpu_diode", \
@@ -221,7 +226,7 @@ struct asmc_softc {
 				  "heatsink_2", "memory_controller", \
 				  "pci_express_slot_pin", "pci_express_slot_unk" }
 
-#define ASMC_MBP5_TEMPDESCS	{ "Enclosure Bottom 0", "Enclosure Bottom 1", \
+#define ASMC_MBP51_TEMPDESCS	{ "Enclosure Bottom 0", "Enclosure Bottom 1", \
 				  "Enclosure Bottom 2", "Enclosure Bottom 3", \
 				  "CPU Diode", "CPU ???", \
 				  "CPU Pin", "GPU Diode", \
@@ -230,6 +235,58 @@ struct asmc_softc {
 				  "GPU 2 Heatsink", "Northbridge Diode", \
 				  "Northbridge Pin", "Unknown", \
 				  "Heatsink 2", "Memory Controller", \
+				  "PCI Express Slot Pin", "PCI Express Slot (unk)" }
+
+#define ASMC_MBP62_TEMPS	{ "TB0T", "TB1T", "TB2T", \
+				  "TC0C", "TC0D", "TC0P", \
+				  "TC1C", "TG0D", "TG0P", \
+				  "TG0T", "TMCD", "TP0P", \
+				  "TPCD", "Th1H", "Th2H", \
+				  "Tm0P", "Ts0P", "Ts0S" }
+
+#define ASMC_MBP62_TEMPNAMES	{ "enclosure_bottom_0", "enclosure_bottom_1", \
+				  "enclosure_bottom_2", "cpu0", \
+				  "cpu_diode", "cpu_proximity", \
+				  "cpu1", "gpu_diode", \
+				  "gpu_pin", "gpu_transistor", \
+				  "TMCD", "pch_controller_proximity", \
+				  "pch_die", "heatsink1", \
+				  "heatsink2", "memory-controller", \
+				  "palmrest", "memoryproximity" }
+
+#define ASMC_MBP62_TEMPDESCS	{ "Enclosure Bottom 0", "Enclosure Bottom 1", \
+				  "Enclosure Bottom 2", "CPU 0", \
+				  "CPU Diode", "CPU Proximity", \
+				  "CPU 1", "GPU Diode", \
+				  "GPU Pin", "GPU Transistor", \
+				  "TMCD", "PCH Controller Proximity", \
+				  "PCH Die", "Heat Sink 1", \
+				  "Heat Sink 2", "Memory Controller", \
+				  "Palm Rest", "Memory Proximity" }
+
+#define ASMC_MBP55_TEMPS	{ "TB0T", "TB1T", \
+				  "TB2T", "TB3T", \
+				  "TC0D", "TC0P", \
+				  "TN0D", "TN0P", \
+				  "TTF0", \
+				  "Th0H", "Th1H", "ThFH", \
+				  "Ts0P", "Ts0S", \
+				  NULL }
+
+#define ASMC_MBP55_TEMPNAMES	{ "enclosure_bottom_0", "enclosure_bottom_1", \
+				  "enclosure_bottom_2", "enclosure_bottom_3", \
+				  "cpu_diode", "cpu_pin", \
+				  "northbridge_diode", "northbridge_pin", \
+				  "unknown", \
+				  "heatsink_0", "heatsink_1", "heatsink_2", \
+				  "pci_express_slot_pin", "pci_express_slot_unk" }
+
+#define ASMC_MBP55_TEMPDESCS	{ "Enclosure Bottom 0", "Enclosure Bottom 1", \
+				  "Enclosure Bottom 2", "Enclosure Bottom 3", \
+				  "CPU Diode", "CPU Pin", \
+				  "Northbridge Diode", "Northbridge Pin", \
+				  "Unknown", \
+				  "Heatsink 0", "Heatsink 1", "Heatsink 2", \
 				  "PCI Express Slot Pin", "PCI Express Slot (unk)" }
 
 #define ASMC_MBP81_TEMPS	{ "TB0T", "TB1T", "TB2T", "TC0C", "TC0D", \
@@ -715,6 +772,31 @@ struct asmc_softc {
 	                          "TCXC", "THSP", "Memory Bank A", "PCH Die", \
 	                          "Ta0P", "Heatpipe", "Mainboard Proximity 1", "Mainboard Proximity 2", \
 	                          "Palm Rest", "Memory Proximity" }
+
+/*
+ * TODO: validate the temp zones for MBA 6.x !
+ */
+#define	ASMC_MBA6_TEMPS		{ "TB0T", "TB1T", "TB2T", \
+	                          "TC0E", "TC0F", "TC0P", \
+	                          "TC1C", "TC2C", "TCGC", "TCSA", \
+	                          "TCXC", "THSP", "TM0P", "TPCD", \
+	                          "Ta0P", "Th1H", "Tm0P", \
+	                          "Ts0P", "Ts0S", NULL }
+
+#define	ASMC_MBA6_TEMPNAMES	{ "enclosure1", "enclosure2", "enclosure3", \
+	                          "cputemp1", "cputemp2", "cpuproximity", \
+	                          "cpucore1", "cpucore2", "cpupeci", "pecisa", \
+	                          "TCXC", "THSP", "memorybank", "pchdie", \
+	                          "Ta0P", "heatpipe", "mainboardproximity1", \
+	                          "palmrest", "memoryproximity" }
+
+#define	ASMC_MBA6_TEMPDESCS	{ "Enclosure Bottom 1", "Enclosure Bottom 2", "Enclosure Bottom 3", \
+	                          "CPU Temp 1", "CPU Temp 2", "CPU Proximity", \
+	                          "CPU Core 1", "CPU Core 2", "CPU Peci Core", "PECI SA", \
+	                          "TCXC", "THSP", "Memory Bank A", "PCH Die", \
+	                          "Ta0P", "Heatpipe", "Mainboard Proximity 1", \
+	                          "Palm Rest", "Memory Proximity" }
+
 
 #define	ASMC_MBA7_TEMPS		{ "TB0T", "TB1T", "TB2T", \
                          	  "TC0E", "TC0F", "TC0P", \

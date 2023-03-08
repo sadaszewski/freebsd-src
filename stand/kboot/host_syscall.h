@@ -29,6 +29,7 @@
 #define _HOST_SYSCALL_H
 
 #include <stand.h>
+#include <assert.h>
 
 long host_syscall(int number, ...);
 
@@ -37,7 +38,6 @@ long host_syscall(int number, ...);
  */
 typedef uint64_t host_dev_t;
 typedef uint64_t host_ino_t;
-typedef int64_t host_nlink_t;
 typedef unsigned int host_mode_t;
 typedef unsigned int host_uid_t;
 typedef unsigned int host_gid_t;
@@ -46,6 +46,28 @@ typedef long host_blksize_t;
 typedef int64_t host_blkcnt_t;
 
 #include "stat_arch.h"
+
+/*
+ * stat flags
+ * These are arch independent and match the values in nolib and uapi headers
+ * with HOST_ prepended.
+ */
+#define	HOST_S_IFMT	0170000
+#define	HOST_S_IFIFO	0010000
+#define	HOST_S_IFCHR	0020000
+#define	HOST_S_IFDIR	0040000
+#define	HOST_S_IFBLK	0060000
+#define	HOST_S_IFREG	0100000
+#define	HOST_S_IFLNK	0120000
+#define	HOST_S_IFSOCK	0140000
+
+#define	HOST_S_ISBLK(mode)	(((mode) & HOST_S_IFMT) == HOST_S_IFBLK)
+#define	HOST_S_ISCHR(mode)	(((mode) & HOST_S_IFMT) == HOST_S_IFCHR)
+#define	HOST_S_ISDIR(mode)	(((mode) & HOST_S_IFMT) == HOST_S_IFDIR)
+#define	HOST_S_ISFIFO(mode)	(((mode) & HOST_S_IFMT) == HOST_S_IFIFO)
+#define	HOST_S_ISLNK(mode)	(((mode) & HOST_S_IFMT) == HOST_S_IFLNK)
+#define	HOST_S_ISREG(mode)	(((mode) & HOST_S_IFMT) == HOST_S_IFREG)
+#define	HOST_S_ISSOCK(mode)	(((mode) & HOST_S_IFMT) == HOST_S_IFSOCK)
 
 /*
  * Constants for open, fcntl, etc
@@ -131,15 +153,36 @@ struct host_kexec_segment {
 	int memsz;
 };
 
+struct host_dirent64 {
+	uint64_t	d_ino;		/* 64-bit inode number */
+	int64_t		d_off;		/* 64-bit offset to next structure */
+	unsigned short	d_reclen;	/* Size of this dirent */
+	unsigned char	d_type;		/* File type */
+	char		d_name[];	/* Filename (null-terminated) */
+};
+
+/* d_type values */
+#define HOST_DT_UNKNOWN		 0
+#define HOST_DT_FIFO		 1
+#define HOST_DT_CHR		 2
+#define HOST_DT_DIR		 4
+#define HOST_DT_BLK		 6
+#define HOST_DT_REG		 8
+#define HOST_DT_LNK		10
+#define HOST_DT_SOCK		12
+#define HOST_DT_WHT		14
+
 /*
  * System Calls
  */
 int host_close(int fd);
 int host_dup(int fd);
+int host_exit(int code);
 int host_fstat(int fd, struct host_kstat *sb);
-int host_getdents(int fd, void *dirp, int count);
+int host_getdents64(int fd, void *dirp, int count);
 int host_getpid(void);
 int host_gettimeofday(struct host_timeval *a, void *b);
+int host_ioctl(int fd, unsigned long request, unsigned long arg);
 int host_kexec_load(unsigned long entry, unsigned long nsegs, struct host_kexec_segment *segs, unsigned long flags);
 ssize_t host_llseek(int fd, int32_t offset_high, int32_t offset_lo, uint64_t *result, int whence);
 int host_mkdir(const char *, host_mode_t);
@@ -163,5 +206,21 @@ ssize_t host_write(int fd, const void *buf, size_t nbyte);
 #define host_getmem(size) \
 	host_mmap(0, size, HOST_PROT_READ | HOST_PROT_WRITE, \
 	    HOST_MAP_PRIVATE | HOST_MAP_ANONYMOUS, -1, 0);
+
+/*
+ * Translate Linux errno to FreeBSD errno. The two system have idenitcal errors
+ * for 1-34. After that, they differ. Linux also has errno that don't map
+ * exactly to FreeBSD's errno, plus the Linux errno are arch dependent >
+ * 34. Since we just need to do this for simple cases, use the simple mapping
+ * function where -1 to -34 are translated to 1 to 34 and all others are EINVAL.
+ * Pass the linux return value, which will be the -errno.
+ */
+static __inline int
+host_to_stand_errno(int e)
+{
+	assert(e < 0);
+
+	return((-e) > 34 ? EINVAL : (-e));
+}
 
 #endif

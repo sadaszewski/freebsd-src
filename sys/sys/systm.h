@@ -150,7 +150,6 @@ void	*hashinit_flags(int count, struct malloc_type *type,
 void	*phashinit(int count, struct malloc_type *type, u_long *nentries);
 void	*phashinit_flags(int count, struct malloc_type *type, u_long *nentries,
     int flags);
-void	g_waitidle(void);
 
 void	cpu_flush_dcache(void *, size_t);
 void	cpu_rootconf(void);
@@ -449,8 +448,11 @@ int	msleep_spin_sbt(const void * _Nonnull chan, struct mtx *mtx,
 	    0, C_HARDCLOCK)
 int	pause_sbt(const char *wmesg, sbintime_t sbt, sbintime_t pr,
 	    int flags);
-#define	pause(wmesg, timo)						\
-	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK)
+static __inline int
+pause(const char *wmesg, int timo)
+{
+	return (pause_sbt(wmesg, tick_sbt * timo, 0, C_HARDCLOCK));
+}
 #define	pause_sig(wmesg, timo)						\
 	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK | C_CATCH)
 #define	tsleep(chan, pri, wmesg, timo)					\
@@ -508,10 +510,6 @@ int alloc_unr_specific(struct unrhdr *uh, u_int item);
 int alloc_unrl(struct unrhdr *uh);
 void free_unr(struct unrhdr *uh, u_int item);
 
-#ifndef __LP64__
-#define UNR64_LOCKED
-#endif
-
 struct unrhdr64 {
         uint64_t	counter;
 };
@@ -523,16 +521,12 @@ new_unrhdr64(struct unrhdr64 *unr64, uint64_t low)
 	unr64->counter = low;
 }
 
-#ifdef UNR64_LOCKED
-uint64_t alloc_unr64(struct unrhdr64 *);
-#else
 static __inline uint64_t
 alloc_unr64(struct unrhdr64 *unr64)
 {
 
 	return (atomic_fetchadd_64(&unr64->counter, 1));
 }
-#endif
 
 void	intr_prof_stack_use(struct thread *td, struct trapframe *frame);
 

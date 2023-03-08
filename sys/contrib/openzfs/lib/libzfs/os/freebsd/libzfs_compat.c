@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -204,6 +204,8 @@ libzfs_error_init(int error)
 	if (modfind("zfs") < 0) {
 		size_t len = snprintf(msg, msglen, dgettext(TEXT_DOMAIN,
 		    "Failed to load %s module: "), ZFS_KMOD);
+		if (len >= msglen)
+			len = msglen - 1;
 		msg += len;
 		msglen -= len;
 	}

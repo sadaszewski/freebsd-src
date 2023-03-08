@@ -159,6 +159,7 @@ typedef enum {
  *
  * Lock key:
  *   (a) allprison_lock
+ *   (A) allproc_lock
  *   (c) set only during creation before the structure is shared, no mutex
  *       required to read
  *   (m) locked by pr_mtx
@@ -176,6 +177,7 @@ struct prison {
 	volatile u_int	 pr_uref;			/* (r) user (alive) refcount */
 	unsigned	 pr_flags;			/* (p) PR_* flags */
 	LIST_HEAD(, prison) pr_children;		/* (a) list of child jails */
+	LIST_HEAD(, proc) pr_proclist;			/* (A) list of jailed processes */
 	LIST_ENTRY(prison) pr_sibling;			/* (a) next in parent's list */
 	struct prison	*pr_parent;			/* (c) containing jail */
 	struct mtx	 pr_mtx;
@@ -194,7 +196,8 @@ struct prison {
 	int		 pr_enforce_statfs;		/* (p) statfs permission */
 	int		 pr_devfs_rsnum;		/* (p) devfs ruleset */
 	enum prison_state pr_state;			/* (q) state in life cycle */
-	int		 pr_spare[2];
+	volatile int	 pr_exportcnt;			/* (r) count of mount exports */
+	int		 pr_spare;
 	int		 pr_osreldate;			/* (c) kern.osreldate value */
 	unsigned long	 pr_hostid;			/* (p) jail hostid */
 	char		 pr_name[MAXHOSTNAMELEN];	/* (p) admin jail name */
@@ -251,7 +254,8 @@ struct prison_racct {
 #define	PR_ALLOW_SUSER			0x00000400
 #define	PR_ALLOW_RESERVED_PORTS		0x00008000
 #define	PR_ALLOW_KMEM_ACCESS		0x00010000	/* reserved, not used yet */
-#define	PR_ALLOW_ALL_STATIC		0x000187ff
+#define	PR_ALLOW_NFSD			0x00020000
+#define	PR_ALLOW_ALL_STATIC		0x000387ff
 
 /*
  * PR_ALLOW_DIFFERENCES determines which flags are able to be
@@ -418,6 +422,7 @@ void getjailname(struct ucred *cred, char *name, size_t len);
 void prison0_init(void);
 int prison_allow(struct ucred *, unsigned);
 int prison_check(struct ucred *cred1, struct ucred *cred2);
+bool prison_check_nfsd(struct ucred *cred);
 int prison_owns_vnet(struct ucred *);
 int prison_canseemount(struct ucred *cred, struct mount *mp);
 void prison_enforce_statfs(struct ucred *cred, struct mount *mp,
@@ -432,6 +437,9 @@ void prison_hold(struct prison *pr);
 void prison_hold_locked(struct prison *pr);
 void prison_proc_hold(struct prison *);
 void prison_proc_free(struct prison *);
+void prison_proc_link(struct prison *, struct proc *);
+void prison_proc_unlink(struct prison *, struct proc *);
+void prison_proc_iterate(struct prison *, void (*)(struct proc *, void *), void *);
 void prison_set_allow(struct ucred *cred, unsigned flag, int enable);
 int prison_ischild(struct prison *, struct prison *);
 bool prison_isalive(const struct prison *);

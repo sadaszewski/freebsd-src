@@ -882,9 +882,11 @@ kdebug_secasv(struct secasvar *sav)
 		kdebug_secnatt(sav->natt);
 	if (sav->replay != NULL) {
 		KEYDBG(DUMP,
-		    SECASVAR_LOCK(sav);
+		    SECASVAR_RLOCK_TRACKER;
+
+		    SECASVAR_RLOCK(sav);
 		    kdebug_secreplay(sav->replay);
-		    SECASVAR_UNLOCK(sav));
+		    SECASVAR_RUNLOCK(sav));
 	}
 	printf("}\n");
 }
@@ -920,9 +922,9 @@ void
 kdebug_mbuf(const struct mbuf *m0)
 {
 	const struct mbuf *m = m0;
-	int i, j;
+	int i;
 
-	for (j = 0; m; m = m->m_next) {
+	for (; m; m = m->m_next) {
 		kdebug_mbufhdr(m);
 		printf("  m_data:\n");
 		for (i = 0; i < m->m_len; i++) {
@@ -931,7 +933,6 @@ kdebug_mbuf(const struct mbuf *m0)
 			if (i % 4 == 0)
 				printf(" ");
 			printf("%02x", mtod(m, const u_char *)[i]);
-			j++;
 		}
 		printf("\n");
 	}
